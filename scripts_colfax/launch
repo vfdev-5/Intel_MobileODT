@@ -1,0 +1,5 @@
+#PBS -N kaggle_mobileODT -o ~/out.log -e ~/err.log
+source env
+echo Start ...
+python resnet_simple.py
+echo Finished
