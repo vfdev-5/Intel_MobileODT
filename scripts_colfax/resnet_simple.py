@@ -17,6 +17,7 @@ import cv2
 from keras.applications.resnet50 import ResNet50
 from keras.layers import Dense, Flatten
 from keras.models import Model
+from keras.callbacks import ModelCheckpoint
 
 from keras.backend import set_image_dim_ordering, image_dim_ordering
 set_image_dim_ordering('th')
@@ -189,7 +190,13 @@ def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mo
 def train(model, train_id_type_list, val_id_type_list, batch_size=16, nb_epochs=10, image_size=(224, 224)):
     samples_per_epoch = 512
     nb_val_samples = 64
-    
+
+    if not os.path.exists('weights'):
+        os.mkdir('weights')
+
+    weights_filename = os.path.join("weights", "resnet50_simple.h5")
+    model_checkpoint = ModelCheckpoint(weights_filename, monitor='loss', save_best_only=True)
+
     print("Training parameters: ", batch_size, nb_epochs, samples_per_epoch, nb_val_samples)
     
     train_iter = data_iterator(train_id_type_list, batch_size=batch_size, image_size=image_size)
@@ -201,10 +208,9 @@ def train(model, train_id_type_list, val_id_type_list, batch_size=16, nb_epochs=
         epochs=nb_epochs,
         validation_data=val_iter,
         validation_steps=nb_val_samples,
-        verbose=2
+        callbacks=[model_checkpoint],
+        verbose=2,
     )
-
-    model.save()
 
     return history
 
