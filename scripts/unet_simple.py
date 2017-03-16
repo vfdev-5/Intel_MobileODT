@@ -23,7 +23,7 @@ from data_utils import type_1_ids, type_2_ids, type_3_ids, test_ids
 from data_utils import get_filename
 from training_utils import get_trainval_id_type_lists, get_test_id_type_list, data_iterator
 from metrics import logloss_mc
-from resnet import get_resnet50
+from unet import get_unet
 
 
 print("\n=========================")
@@ -106,13 +106,13 @@ if __name__ == "__main__":
     print("\n- Get train/val lists ...")
     train_id_type_list, val_id_type_list = get_trainval_id_type_lists()
     print("\n- Get ResNet model ...")
-    resnet = get_resnet50()
+    unet = get_unet()
     print("\n- Start training ...")
-    train(resnet, train_id_type_list, val_id_type_list)
+    train(unet, train_id_type_list, val_id_type_list)
     print("\n- Start validation ...")
-    validate(resnet, val_id_type_list)
+    validate(unet, val_id_type_list)
     print("\n- Start predictions and write submission ...")
-    predict(resnet, info='resnet50_no_additional')
+    predict(unet, info='resnet50_no_additional')
     
 
 
