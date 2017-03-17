@@ -18,7 +18,7 @@ from keras.callbacks import ModelCheckpoint
 
 # Project
 import sys
-sys.path.append('../common')
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'common'))
 from data_utils import type_1_ids, type_2_ids, type_3_ids, test_ids
 from data_utils import get_filename
 from training_utils import get_trainval_id_type_lists, get_test_id_type_list, data_iterator
