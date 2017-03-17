@@ -56,10 +56,16 @@ def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mo
         image_ids = np.empty((batch_size,), dtype=np.object)
         counter = 0
         for i, (image_id, image_type) in enumerate(image_id_type_list):
+            if verbose > 0:
+                print("Image id/type:", image_id, image_type, "| counter=", counter)
 
             img = get_image_data(image_id, image_type)
+            if img.dtype.kind is not 'u':
+                print("Image is corrupted. Id/Type:", image_id, image_type)
+                continue
+
             img = cv2.resize(img, dsize=image_size[::-1])
-            img = img.transpose([2 ,0 ,1])
+            img = img.transpose([2, 0, 1])
             img = img.astype(np.float32) / 255.0
 
             X[counter, :, :, :] = img
@@ -67,9 +73,6 @@ def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mo
                 image_ids[counter] = image_id
             else:
                 Y[counter, type_to_index[image_type]] = 1
-
-            if verbose > 0:
-                print("Image id/type:", image_id, image_type, "| counter=", counter)
 
             counter += 1
             if counter == batch_size:
