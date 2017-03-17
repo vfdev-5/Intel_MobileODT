@@ -24,8 +24,9 @@ print("=========================\n")
 
 
 def read(type_ids, image_type):
-    for image_id in type_ids:
-        print("----", image_id, image_type)
+    ll = len(type_ids)
+    for i, image_id in enumerate(type_ids):
+        print("----", image_id, image_type, i, "/", ll)
         img = get_image_data(image_id, image_type)
         print("-----", img.shape, img.min(), img.max(), img.mean(), img.std())
 
@@ -34,13 +35,13 @@ if __name__ == "__main__":
 
     print("\n {} - Read train data ...".format(datetime.datetime.now()))
     print("\n {} --- type 1 ".format(datetime.datetime.now()))
-    read(type_1_ids, "Type_1")
+    # read(type_1_ids, "Type_1")
 
     print("\n {} --- type 2 ".format(datetime.datetime.now()))
-    read(type_2_ids, "Type_2")
+    # read(type_2_ids, "Type_2")
 
     print("\n {} --- type 3 ".format(datetime.datetime.now()))
-    read(type_2_ids, "Type_3")
+    read(type_3_ids, "Type_3")
 
     print("\n {} - Read test data ...".format(datetime.datetime.now()))
     read(test_ids, "Test")
