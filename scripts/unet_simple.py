@@ -27,18 +27,18 @@ print("=========================\n")
 
 
 def train(model, train_id_type_list, val_id_type_list, batch_size=16, nb_epochs=10, image_size=(224, 224)):
-    samples_per_epoch = 512
-    nb_val_samples = 64
+    samples_per_epoch = 2048
+    nb_val_samples = 512
 
     if not os.path.exists('weights'):
         os.mkdir('weights')
 
-    weights_filename = os.path.join("weights", "resnet50_simple.h5")
+    weights_filename = os.path.join("weights", "unet_simple.h5")
     model_checkpoint = ModelCheckpoint(weights_filename, monitor='loss', save_best_only=True)
 
     print("Training parameters: ", batch_size, nb_epochs, samples_per_epoch, nb_val_samples)
     
-    train_iter = data_iterator(train_id_type_list, batch_size=batch_size, image_size=image_size)
+    train_iter = data_iterator(train_id_type_list, batch_size=batch_size, image_size=image_size,verbose=1)
     val_iter = data_iterator(val_id_type_list, batch_size=batch_size, image_size=image_size)
     
     history = model.fit_generator(
@@ -48,7 +48,7 @@ def train(model, train_id_type_list, val_id_type_list, batch_size=16, nb_epochs=
         validation_data=val_iter,
         nb_val_samples=nb_val_samples,
         callbacks=[model_checkpoint],
-        verbose=2,
+        verbose=1,
     )
 
     return history
@@ -108,11 +108,11 @@ if __name__ == "__main__":
     print("\n {} - Get U-Net model ...".format(datetime.datetime.now()))
     unet = get_unet()
     print("\n {} - Start training ...".format(datetime.datetime.now()))
-    train(unet, train_id_type_list, val_id_type_list, batch_size=batch_size)
+    train(unet, train_id_type_list, val_id_type_list, nb_epochs=1, batch_size=batch_size)
     print("\n {} - Start validation ...".format(datetime.datetime.now()))
-    validate(unet, val_id_type_list, batch_size=batch_size)
+    # validate(unet, val_id_type_list, batch_size=batch_size)
     print("\n {} - Start predictions and write submission ...".format(datetime.datetime.now()))
-    predict(unet, info='unet_no_additional', batch_size=batch_size)
+    # predict(unet, info='unet_no_additional', batch_size=batch_size)
     print("\n {} - Scripted finished".format(datetime.datetime.now()))
 
 
