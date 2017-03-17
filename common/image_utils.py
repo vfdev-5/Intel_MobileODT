@@ -1,6 +1,7 @@
 
 import cv2
 from PIL import Image
+import numpy as np
 
 # Project
 from data_utils import get_filename
@@ -33,4 +34,4 @@ def _get_image_data_pil(image_id, image_type):
         img = Image.open(fname)
     except Exception as e:
         assert False, "Failed to read image : %s, %s. Error message: %s" % (image_id, image_type, e)
-    return img
+    return np.asarray(img)
