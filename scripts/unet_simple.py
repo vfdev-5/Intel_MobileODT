@@ -18,7 +18,7 @@ from keras.callbacks import ModelCheckpoint
 
 # Project
 import sys
-sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), 'common'))
+sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'common'))
 from data_utils import type_1_ids, type_2_ids, type_3_ids, test_ids
 from data_utils import get_filename
 from training_utils import get_trainval_id_type_lists, get_test_id_type_list, data_iterator
@@ -105,7 +105,7 @@ def predict(model, batch_size=16, image_size=(224, 224), info=''):
 if __name__ == "__main__":
     print("\n- Get train/val lists ...")
     train_id_type_list, val_id_type_list = get_trainval_id_type_lists()
-    print("\n- Get ResNet model ...")
+    print("\n- Get U-Net model ...")
     unet = get_unet()
     print("\n- Start training ...")
     train(unet, train_id_type_list, val_id_type_list)

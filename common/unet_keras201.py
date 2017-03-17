@@ -4,7 +4,8 @@ from keras.layers.merge import Concatenate
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 
-from keras.backend import set_image_dim_ordering, image_dim_ordering
+from keras.backend import set_image_dim_ordering
+
 set_image_dim_ordering('th')
 
 
