@@ -43,10 +43,10 @@ def train(model, train_id_type_list, val_id_type_list, batch_size=16, nb_epochs=
     
     history = model.fit_generator(
         train_iter,
-        steps_per_epoch=samples_per_epoch, 
-        epochs=nb_epochs,
+        samples_per_epoch=samples_per_epoch,
+        nb_epoch=nb_epochs,
         validation_data=val_iter,
-        validation_steps=nb_val_samples,
+        nb_val_samples=nb_val_samples,
         callbacks=[model_checkpoint],
         verbose=2,
     )
@@ -102,15 +102,15 @@ if __name__ == "__main__":
     if 'c001' in platform.node():
         batch_size = 256
 
-    print("\n- Get train/val lists ...")
+    print("\n {} - Get train/val lists ...".format(datetime.datetime.now()))
     train_id_type_list, val_id_type_list = get_trainval_id_type_lists()
-    print("\n- Get U-Net model ...")
+    print("\n {} - Get U-Net model ...".format(datetime.datetime.now()))
     unet = get_unet()
-    print("\n- Start training ...")
+    print("\n {} - Start training ...".format(datetime.datetime.now()))
     train(unet, train_id_type_list, val_id_type_list, batch_size=batch_size)
-    print("\n- Start validation ...")
+    print("\n {} - Start validation ...".format(datetime.datetime.now()))
     validate(unet, val_id_type_list, batch_size=batch_size)
-    print("\n- Start predictions and write submission ...")
+    print("\n {} - Start predictions and write submission ...".format(datetime.datetime.now()))
     predict(unet, info='unet_no_additional', batch_size=batch_size)
     
 
