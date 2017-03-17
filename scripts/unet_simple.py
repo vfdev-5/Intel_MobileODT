@@ -38,8 +38,8 @@ def train(model, train_id_type_list, val_id_type_list, batch_size=16, nb_epochs=
 
     print("Training parameters: ", batch_size, nb_epochs, samples_per_epoch, nb_val_samples)
     
-    train_iter = data_iterator(train_id_type_list, batch_size=batch_size, image_size=image_size,verbose=1)
-    val_iter = data_iterator(val_id_type_list, batch_size=batch_size, image_size=image_size)
+    train_iter = data_iterator(train_id_type_list, batch_size=batch_size, image_size=image_size, verbose=1)
+    val_iter = data_iterator(val_id_type_list, batch_size=batch_size, image_size=image_size, verbose=1)
     
     history = model.fit_generator(
         train_iter,
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
     batch_size = 16
     if 'c001' in platform.node():
-        batch_size = 128
+        batch_size = 512
         print("-- On the cluster --")
 
     print("\n {} - Get train/val lists ...".format(datetime.datetime.now()))

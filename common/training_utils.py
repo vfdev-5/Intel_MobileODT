@@ -22,7 +22,6 @@ def get_trainval_id_type_lists(val_split=0.3, type_ids=(type_1_ids, type_2_ids, 
             train_id_type_list.append((image_id, image_type))
         count += 1
 
-
     count = 0
     val_id_type_list = []
     val_ids = [ids[tl: tl +vl] for ids, tl, vl in zip(type_ids, train_ll, val_ll)]
@@ -70,7 +69,7 @@ def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mo
                 Y[counter, type_to_index[image_type]] = 1
 
             if verbose > 0:
-                print("Image id/type:", image_id, image_type)
+                print("Image id/type:", image_id, image_type, "| counter=", counter)
 
             counter += 1
             if counter == batch_size:
@@ -81,8 +80,8 @@ def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mo
                 counter = 0
 
         if counter > 0:
-            X = X[:counter ,: ,: ,:]
-            Y = Y[:counter ,:]
+            X = X[:counter, :, :, :]
+            Y = Y[:counter, :]
             image_ids = image_ids[:counter]
             yield (X, Y) if not test_mode else (X, Y, image_ids)
 
