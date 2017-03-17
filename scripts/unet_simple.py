@@ -66,7 +66,10 @@ def validate(model, val_id_type_list, batch_size=16, image_size=(224, 224)):
         loss = logloss_mc(Y_true, Y_pred)
         total_loss += s * loss
         print("--", total_counter, "batch loss : ", loss)
-    
+
+    if total_counter == 0:
+        total_counter += 1
+
     total_loss *= 1.0 / total_counter   
     print("Total loss : ", total_loss)
     
@@ -92,16 +95,23 @@ def predict(model, batch_size=16, image_size=(224, 224), info=''):
 
 
 if __name__ == "__main__":
+
+    import platform
+
+    batch_size = 16
+    if 'c001' in platform.node():
+        batch_size = 256
+
     print("\n- Get train/val lists ...")
     train_id_type_list, val_id_type_list = get_trainval_id_type_lists()
     print("\n- Get U-Net model ...")
     unet = get_unet()
     print("\n- Start training ...")
-    #train(unet, train_id_type_list, val_id_type_list)
+    train(unet, train_id_type_list, val_id_type_list, batch_size=batch_size)
     print("\n- Start validation ...")
-    validate(unet, val_id_type_list)
+    validate(unet, val_id_type_list, batch_size=batch_size)
     print("\n- Start predictions and write submission ...")
-    predict(unet, info='resnet50_no_additional')
+    predict(unet, info='unet_no_additional', batch_size=batch_size)
     
 
 
