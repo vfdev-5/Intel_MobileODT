@@ -112,7 +112,7 @@ if __name__ == "__main__":
     validate(unet, val_id_type_list, batch_size=batch_size)
     print("\n {} - Start predictions and write submission ...".format(datetime.datetime.now()))
     predict(unet, info='unet_no_additional', batch_size=batch_size)
-    
+    print("\n {} - Scripted finished".format(datetime.datetime.now()))
 
 
 

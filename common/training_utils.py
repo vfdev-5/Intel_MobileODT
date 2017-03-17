@@ -49,6 +49,8 @@ def get_test_id_type_list():
 
 def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mode=False):
 
+    assert len(image_id_type_list) > 0, "Input data image/type list is empty"
+
     while True:
         X = np.zeros((batch_size, 3) + image_size, dtype=np.float32)
         Y = np.zeros((batch_size, 3), dtype=np.uint8)
