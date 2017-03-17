@@ -101,6 +101,7 @@ if __name__ == "__main__":
     batch_size = 16
     if 'c001' in platform.node():
         batch_size = 256
+        print("-- On the cluster --")
 
     print("\n {} - Get train/val lists ...".format(datetime.datetime.now()))
     train_id_type_list, val_id_type_list = get_trainval_id_type_lists()

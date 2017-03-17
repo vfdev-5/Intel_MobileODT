@@ -60,5 +60,5 @@ def get_unet(image_size=(224, 224), n_filters=32):
     outputs = Dense(3, activation='softmax')(x)
 
     model = Model(input=inputs, output=outputs)
-    model.compile(loss='categorical_crossentropy', optimizer='adadelta', metrics=['accuracy', 'recall', 'precision'])
+    model.compile(loss='categorical_crossentropy', optimizer='adadelta', metrics=['accuracy',])
     return model
