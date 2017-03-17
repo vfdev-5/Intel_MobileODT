@@ -35,10 +35,10 @@ if __name__ == "__main__":
 
     print("\n {} - Read train data ...".format(datetime.datetime.now()))
     print("\n {} --- type 1 ".format(datetime.datetime.now()))
-    # read(type_1_ids, "Type_1")
+    read(type_1_ids, "Type_1")
 
     print("\n {} --- type 2 ".format(datetime.datetime.now()))
-    # read(type_2_ids, "Type_2")
+    read(type_2_ids, "Type_2")
 
     print("\n {} --- type 3 ".format(datetime.datetime.now()))
     read(type_3_ids, "Type_3")
