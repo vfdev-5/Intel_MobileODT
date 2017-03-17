@@ -1,14 +1,3 @@
-# This Python 3 environment comes with many helpful analytics libraries installed
-# It is defined by the kaggle/python docker image: https://github.com/kaggle/docker-python
-# For example, here's several helpful packages to load in 
-
-import platform
-
-if 'c001' in platform.node():
-    import sys
-    # Remove Keras 1.1
-    sys.path = sys.path[2:]
-
 import os
 import datetime
 
@@ -23,7 +12,7 @@ from data_utils import type_1_ids, type_2_ids, type_3_ids, test_ids
 from data_utils import get_filename
 from training_utils import get_trainval_id_type_lists, get_test_id_type_list, data_iterator
 from metrics import logloss_mc
-from unet import get_unet
+from unet_keras122 import get_unet
 
 
 print("\n=========================")
@@ -108,7 +97,7 @@ if __name__ == "__main__":
     print("\n- Get U-Net model ...")
     unet = get_unet()
     print("\n- Start training ...")
-    train(unet, train_id_type_list, val_id_type_list)
+    #train(unet, train_id_type_list, val_id_type_list)
     print("\n- Start validation ...")
     validate(unet, val_id_type_list)
     print("\n- Start predictions and write submission ...")
