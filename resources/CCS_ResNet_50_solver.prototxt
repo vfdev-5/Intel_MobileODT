@@ -1,0 +1,15 @@
+test_iter: 11
+test_interval: 26
+base_lr: 0.001
+display: 3
+max_iter: 780
+lr_policy: "exp"
+gamma: 0.993445511603
+momentum: 0.9
+weight_decay: 1e-05
+snapshot: 130
+solver_mode: CPU
+random_seed: 2017
+net: "/home/u2459/Intel_MobileODT/resources/CCS_ResNet_50_train_val.prototxt"
+solver_type: ADADELTA
+snapshot_prefix: "/home/u2459/Intel_MobileODT/results/weights/CCS_ResNet_50"

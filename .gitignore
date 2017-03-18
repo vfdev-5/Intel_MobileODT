@@ -5,6 +5,7 @@ input/
 results/*
 *.lmdb
 *.binproto
+*.binaryproto
 *.caffemodel
 *.solverstate
 *.h5
