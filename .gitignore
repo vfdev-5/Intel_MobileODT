@@ -9,6 +9,9 @@ results/*
 *.caffemodel
 *.solverstate
 *.h5
+train.txt*
+val.txt*
+labels.txt*
 
 common/otb_conf.yaml
 

@@ -3,8 +3,10 @@ from keras.layers import Dense, Flatten, Input, Conv2D, Activation, MaxPooling2D
 from keras.layers.merge import Concatenate
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
-
 from keras.backend import set_image_dim_ordering
+from keras import __version__
+
+assert __version__ == '2.0.1', "Wring Keras version : %s" % __version__
 
 set_image_dim_ordering('th')
 

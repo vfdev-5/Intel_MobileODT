@@ -2,8 +2,10 @@
 from keras.layers import Dense, Flatten, Input, Convolution2D, Activation, MaxPooling2D, UpSampling2D, merge
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
-
 from keras.backend import set_image_dim_ordering
+from keras import __version__
+
+assert __version__ == '1.2.2', "Wring Keras version : %s" % __version__
 
 set_image_dim_ordering('th')
 
@@ -55,7 +57,8 @@ def get_unet(image_size=(224, 224), n_filters=32):
     inputs = Input((3,) + image_size)
 
     list_encoder, list_nb_filters = encoder(inputs, n_filters)
-    x = decoder(list_encoder, list_nb_filters)
+    #x = decoder(list_encoder, list_nb_filters)
+    x = list_encoder[-1]
     x = Flatten()(x)
     outputs = Dense(3, activation='softmax')(x)
 

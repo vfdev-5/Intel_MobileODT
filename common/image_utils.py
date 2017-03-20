@@ -25,16 +25,19 @@ def _get_image_data_opencv(image_id, image_type):
     return img
 
 
-def _get_image_data_pil(image_id, image_type):
+def _get_image_data_pil(image_id, image_type, return_exif_md=False):
     """
     Method to get image data as np.array specifying image id and type
     """
     fname = get_filename(image_id, image_type)
     try:
-        img = Image.open(fname)
+        img_pil = Image.open(fname)
     except Exception as e:
         assert False, "Failed to read image : %s, %s. Error message: %s" % (image_id, image_type, e)
 
-    img = np.asarray(img)
+    img = np.asarray(img_pil)
     assert isinstance(img, np.ndarray), "Open image is not an ndarray. Image id/type : %s, %s" % (image_id, image_type)
-    return img
+    if not return_exif_md:
+        return img
+    else:
+        return img, img_pil._getexif()
