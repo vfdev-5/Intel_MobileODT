@@ -1,3 +1,0 @@
-#PBS -l nodes=1:knl7210:ram96gb -o /home/u2459 -e /home/u2459 -N python_inf
-export PATH=$PATH:/opt/caffe-master/build/tools/
-python -c "import time;time.sleep(1000000000)"

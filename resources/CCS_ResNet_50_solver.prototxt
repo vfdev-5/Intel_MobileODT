@@ -8,9 +8,9 @@ gamma: 0.993445511603
 momentum: 0.9
 weight_decay: 1e-05
 snapshot: 130
-solver_mode: GPU
+solver_mode: CPU
 random_seed: 2017
 iter_size: 1
-net: "/Users/vfomin/Documents/ML/Kaggle/Intel_MobileODT/resources/CCS_ResNet_50_train_val.prototxt"
+net: "Intel_MobileODT/resources/CCS_ResNet_50_4d_trainval.prototxt"
 solver_type: ADADELTA
-snapshot_prefix: "/Users/vfomin/Documents/ML/Kaggle/Intel_MobileODT/results/weights/CCS_ResNet_50"
+snapshot_prefix: "Intel_MobileODT/results/weights/CCS_ResNet_50"
