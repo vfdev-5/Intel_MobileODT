@@ -1,0 +1,10 @@
+item {
+  name: "os"
+  label: 0
+  display_name: "os"
+}
+item {
+  name: "cervix"
+  label: 1
+  display_name: "cervix"
+}

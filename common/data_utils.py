@@ -1,5 +1,6 @@
 
 import os
+import json 
 import platform
 from glob import glob
 
@@ -56,3 +57,40 @@ def get_filename(image_id, image_type):
 
     ext = 'jpg'
     return os.path.join(data_path, "{}.{}".format(image_id, ext))
+
+
+def get_annotations(filename):
+    """
+    Annotation file created by SLOTH application
+    
+    :return: ndarray of dicts 
+        {
+            "annotations": [
+                {
+                    "class": "os",
+                    "height": 10.0,
+                    "type": "rect",
+                    "width": 20.0,
+                    "x": 52.0,
+                    "y": 48.0
+                },
+                {
+                    "class": "cervix",
+                    "height": 275.0,
+                    "type": "rect",
+                    "width": 300.0,
+                    "x": 10.0,
+                    "y": 5.0
+                }],
+            "class": "image",
+            "filename": "train/Type_1/590.jpg"
+        }
+    """
+    labels = []
+    with open(filename, 'r') as reader:
+        str_data = ''.join(reader.readlines())
+        raw_data = json.loads(str_data)
+        for item in raw_data:
+            if len(item['annotations']) > 0:
+                labels.append(item)
+    return labels
