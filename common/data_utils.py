@@ -7,12 +7,21 @@ from glob import glob
 
 if 'c001' in platform.node():
     DATA_PATH = "/data/kaggle"
+    INPUT_PATH = os.path.abspath("../input")
 else:
-    DATA_PATH = "../input"
+    DATA_PATH = os.path.abspath("../input")
+    INPUT_PATH = DATA_PATH
+
 
 TRAIN_DATA = os.path.join(DATA_PATH, "train")
 TEST_DATA = os.path.join(DATA_PATH, "test")
 ADDITIONAL_DATA = os.path.join(DATA_PATH, "additional")
+
+RESOURCES_PATH = os.path.abspath("../resources")
+GENERATED_DATA = os.path.join(INPUT_PATH, 'generated')
+
+if not os.path.exists(GENERATED_DATA):
+    os.makedirs(GENERATED_DATA)
 
 type_1_files = glob(os.path.join(TRAIN_DATA, "Type_1", "*.jpg"))
 type_1_ids = [s[len(os.path.join(TRAIN_DATA, "Type_1"))+1:-4] for s in type_1_files]
@@ -42,6 +51,7 @@ def get_filename(image_id, image_type):
     """
     Method to get image file path from its id and type
     """
+    ext = 'jpg'
     if image_type == "Type_1" or \
         image_type == "Type_2" or \
         image_type == "Type_3":
@@ -52,10 +62,15 @@ def get_filename(image_id, image_type):
           image_type == "AType_2" or \
           image_type == "AType_3":
         data_path = os.path.join(ADDITIONAL_DATA, image_type[1:])
+    elif image_type == 'label':
+        data_path = os.path.join(GENERATED_DATA, 'labels')
+        ext = 'npz'
     else:
         raise Exception("Image type '%s' is not recognized" % image_type)
 
-    ext = 'jpg'
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
+
     return os.path.join(data_path, "{}.{}".format(image_id, ext))
 
 

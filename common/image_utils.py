@@ -11,7 +11,19 @@ def get_image_data(image_id, image_type):
     """
     Method to get image data as np.array specifying image id and type
     """
+    if image_type == 'label':
+        return np.load(get_filename(image_id, image_type))['arr_0']
     return _get_image_data_pil(image_id, image_type)
+
+
+def imwrite(img, image_id, image_type):
+    output_filename = get_filename(image_id, image_type)
+    if image_type == 'label':
+        pass
+        np.savez(output_filename, img)
+    else:
+        pil_image = Image.fromarray(img)
+        pil_image.save(output_filename)
 
 
 def _get_image_data_opencv(image_id, image_type):
