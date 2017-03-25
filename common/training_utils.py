@@ -1,4 +1,5 @@
 
+import os
 import numpy as np
 import cv2
 
@@ -41,6 +42,30 @@ def get_trainval_id_type_lists(val_split=0.3, type_ids=(type_1_ids, type_2_ids, 
     print("Validation dataset contains : ")
     print("-", val_ll, " images of corresponding types")
 
+    return train_id_type_list, val_id_type_list
+
+
+def get_trainval_id_type_lists2(annotations, val_split=0.3):
+    n = len(annotations)
+    np.random.shuffle(annotations)  
+    ll = int(n * (1.0 - val_split))
+    train_annotations = annotations[:ll]
+    val_annotations = annotations[ll:]
+
+    train_id_type_list = [] 
+    for i, annotation in enumerate(train_annotations):
+        image_name = annotation['filename']
+        image_id = os.path.basename(image_name)[:-4]
+        image_type = os.path.split(os.path.dirname(image_name))[1]
+        train_id_type_list.append((image_id, image_type))
+        
+    val_id_type_list = []
+    for i, annotation in enumerate(val_annotations):
+        image_name = annotation['filename']
+        image_id = os.path.basename(image_name)[:-4]
+        image_type = os.path.split(os.path.dirname(image_name))[1]
+        val_id_type_list.append((image_id, image_type))
+    
     return train_id_type_list, val_id_type_list
 
 

@@ -53,3 +53,34 @@ def _get_image_data_pil(image_id, image_type, return_exif_md=False):
         return img
     else:
         return img, img_pil._getexif()
+
+
+def label_to_index(label):
+    try:
+        index = ['os', 'cervix'].index(label)
+    except:
+        raise Exception("Label '%s' is unknown" % label)
+    return index
+
+
+def generate_label_images(annotations, output_path):
+    n = len(annotations)
+    for i, annotation in enumerate(annotations):
+
+        image_name = annotation['filename']
+        image_id = os.path.basename(image_name)[:-4]
+        image_type = os.path.split(os.path.dirname(image_name))[1]
+        src_image = get_image_data(image_id, image_type)
+        
+        print '--', image_id, image_type, i, '/', n     
+        ll = len(annotation['annotations'])
+        label_image = np.zeros(src_image.shape[:2] + (ll,), dtype=np.uint8)
+        for label in annotation['annotations']:
+            
+            assert label['type'] == u'rect', "Type '%s' is not supported" % label['type']
+            index = label_to_index(label['class'])
+            pt1 = (int(label['x']), int(label['y']))
+            pt2 = (pt1[0] + int(label['width']), pt1[1] + int(label['height']))
+            label_image[pt1[1]:pt2[1], pt1[0]:pt2[0], index] = 1
+        
+        imwrite(label_image, image_id + '_' + image_type, 'label')    
