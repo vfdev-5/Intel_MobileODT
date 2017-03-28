@@ -65,6 +65,9 @@ def get_filename(image_id, image_type):
     elif image_type == 'label':
         data_path = os.path.join(GENERATED_DATA, 'labels')
         ext = 'npz'
+    elif image_type == 'label_gray':
+        data_path = os.path.join(GENERATED_DATA, 'labels_gray')
+        ext = 'png'
     else:
         raise Exception("Image type '%s' is not recognized" % image_type)
 

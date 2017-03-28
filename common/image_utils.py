@@ -1,4 +1,5 @@
 
+import os 
 import cv2
 from PIL import Image
 import numpy as np
@@ -19,7 +20,6 @@ def get_image_data(image_id, image_type):
 def imwrite(img, image_id, image_type):
     output_filename = get_filename(image_id, image_type)
     if image_type == 'label':
-        pass
         np.savez(output_filename, img)
     else:
         pil_image = Image.fromarray(img)
@@ -62,6 +62,30 @@ def label_to_index(label):
         raise Exception("Label '%s' is unknown" % label)
     return index
 
+
+def generate_label_gray_images(annotations, output_path):
+    n = len(annotations)
+    for i, annotation in enumerate(annotations):
+
+        image_name = annotation['filename']
+        image_id = os.path.basename(image_name)[:-4]
+        image_type = os.path.split(os.path.dirname(image_name))[1]
+        src_image = get_image_data(image_id, image_type)
+        
+        print '--', image_id, image_type, i, '/', n     
+        ll = len(annotation['annotations'])
+        label_image = np.zeros(src_image.shape[:2], dtype=np.uint8)
+        for label in annotation['annotations']:
+            
+            assert label['type'] == u'rect', "Type '%s' is not supported" % label['type']
+            index = label_to_index(label['class']) + 1
+            pt1 = (int(label['x']), int(label['y']))
+            pt2 = (pt1[0] + int(label['width']), pt1[1] + int(label['height']))
+            mask = label_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] == 0            
+            label_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = index * mask + label_image[pt1[1]:pt2[1], pt1[0]:pt2[0]]
+        
+        imwrite(label_image, image_id + '_' + image_type, 'label_gray')  
+        
 
 def generate_label_images(annotations, output_path):
     n = len(annotations)

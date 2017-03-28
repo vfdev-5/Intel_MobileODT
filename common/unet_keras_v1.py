@@ -1,11 +1,11 @@
 
+from keras import __version__
+assert __version__[0] == '1', "Wrong Keras version : %s" % __version__
+
 from keras.layers import Dense, Flatten, Input, Convolution2D, Activation, MaxPooling2D, UpSampling2D, merge
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.backend import set_image_dim_ordering
-from keras import __version__
-
-assert __version__ == '1.2.2', "Wring Keras version : %s" % __version__
 
 set_image_dim_ordering('th')
 
@@ -52,16 +52,16 @@ def decoder(list_encoder, list_nb_filters):
     return temp_layers[-1]
 
 
-def get_unet(image_size=(224, 224), n_filters=32):
+def get_unet(input_shape, n_classes, n_filters=32):
 
-    inputs = Input((3,) + image_size)
+    inputs = Input(input_shape)
 
     list_encoder, list_nb_filters = encoder(inputs, n_filters)
-    #x = decoder(list_encoder, list_nb_filters)
-    x = list_encoder[-1]
-    x = Flatten()(x)
-    outputs = Dense(3, activation='softmax')(x)
-
+    x = decoder(list_encoder, list_nb_filters) 
+    
+    x = Convolution2D(n_classes, 1, 1, border_mode="same")(x)
+    outputs = Activation("sigmoid")(x)
+    
     model = Model(input=inputs, output=outputs)
     model.compile(loss='categorical_crossentropy', optimizer='adadelta', metrics=['accuracy',])
     return model

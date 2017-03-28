@@ -73,6 +73,25 @@ def get_test_id_type_list():
     return [(image_id, 'Test') for image_id in test_ids]
 
 
+def get_test_id_type_list2(annotations):
+    trainval_id_type_list = []
+    for annotation in annotations:
+        image_name = annotation['filename']
+        image_id = os.path.basename(image_name)[:-4]
+        image_type = os.path.split(os.path.dirname(image_name))[1]
+        trainval_id_type_list.append((image_id, image_type))
+
+    test_id_type_list = [(image_id, 'Test') for image_id in test_ids]
+    type_ids=(type_1_ids, type_2_ids, type_3_ids)
+    image_types = ["Type_1", "Type_2", "Type_3"]
+
+    for image_ids, image_type in zip(type_ids, image_types):    
+        for image_id in image_ids:
+            if (image_id, image_type) not in trainval_id_type_list:
+                test_id_type_list.append((image_id, image_type))
+    return test_id_type_list
+
+
 def compute_mean_std_images(image_id_type_list, output_size=(224, 224), feature_wise=False, verbose=0):
     """
     Method to compute mean/std input image
