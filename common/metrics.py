@@ -16,3 +16,12 @@ def logloss_mc(y_true, y_prob, epsilon=1e-15):
     y = [y_prob[i, j] for (i, j) in enumerate(y_true)]
     ll = - np.mean(np.log(y))
     return ll
+
+
+def jaccard_index(y_true, y_pred, epsilon=1e-15):
+    """ Jaccard index
+    """
+    intersection = np.sum(y_true * y_pred, axis=(0, -1, -2))
+    sum_ = np.sum(y_true + y_pred, axis=(0, -1, -2))
+    jac = (intersection + epsilon*0.01) / (sum_ - intersection + epsilon)
+    return np.mean(jac)

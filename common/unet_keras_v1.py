@@ -5,7 +5,10 @@ assert __version__[0] == '1', "Wrong Keras version : %s" % __version__
 from keras.layers import Dense, Flatten, Input, Convolution2D, Activation, MaxPooling2D, UpSampling2D, merge
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
+from keras.optimizers import Adam
 from keras.backend import set_image_dim_ordering
+
+from keras_metrics import jaccard_loss, jaccard_index
 
 set_image_dim_ordering('th')
 
@@ -63,5 +66,6 @@ def get_unet(input_shape, n_classes, n_filters=32):
     outputs = Activation("sigmoid")(x)
     
     model = Model(input=inputs, output=outputs)
-    model.compile(loss='categorical_crossentropy', optimizer='adadelta', metrics=['accuracy',])
+    opt = Adam(lr=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+    model.compile(optimizer=opt, loss=jaccard_loss, metrics=[jaccard_index, 'recall', 'precision'])
     return model

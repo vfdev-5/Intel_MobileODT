@@ -1,5 +1,5 @@
 
-import os 
+import os
 import cv2
 from PIL import Image
 import numpy as np
@@ -63,7 +63,7 @@ def label_to_index(label):
     return index
 
 
-def generate_label_gray_images(annotations, output_path):
+def generate_label_gray_images(annotations):
     n = len(annotations)
     for i, annotation in enumerate(annotations):
 
@@ -72,7 +72,7 @@ def generate_label_gray_images(annotations, output_path):
         image_type = os.path.split(os.path.dirname(image_name))[1]
         src_image = get_image_data(image_id, image_type)
         
-        print '--', image_id, image_type, i, '/', n     
+        print('--', image_id, image_type, i, '/', n)
         ll = len(annotation['annotations'])
         label_image = np.zeros(src_image.shape[:2], dtype=np.uint8)
         for label in annotation['annotations']:
@@ -87,8 +87,12 @@ def generate_label_gray_images(annotations, output_path):
         imwrite(label_image, image_id + '_' + image_type, 'label_gray')  
         
 
-def generate_label_images(annotations, output_path):
+def generate_label_images(annotations):
     n = len(annotations)
+
+    def _clamp(x, dim):
+        return min(max(x, 0), dim - 1)
+
     for i, annotation in enumerate(annotations):
 
         image_name = annotation['filename']
@@ -96,15 +100,15 @@ def generate_label_images(annotations, output_path):
         image_type = os.path.split(os.path.dirname(image_name))[1]
         src_image = get_image_data(image_id, image_type)
         
-        print '--', image_id, image_type, i, '/', n     
+        print('--', image_id, image_type, i, '/', n)
         ll = len(annotation['annotations'])
         label_image = np.zeros(src_image.shape[:2] + (ll,), dtype=np.uint8)
+        h, w, _ = label_image.shape
         for label in annotation['annotations']:
-            
             assert label['type'] == u'rect', "Type '%s' is not supported" % label['type']
             index = label_to_index(label['class'])
-            pt1 = (int(label['x']), int(label['y']))
-            pt2 = (pt1[0] + int(label['width']), pt1[1] + int(label['height']))
+            pt1 = (_clamp(int(label['x']), w), _clamp(int(label['y']), h))
+            pt2 = (_clamp(pt1[0] + int(label['width']), w), _clamp(pt1[1] + int(label['height']), h))
             label_image[pt1[1]:pt2[1], pt1[0]:pt2[0], index] = 1
         
         imwrite(label_image, image_id + '_' + image_type, 'label')    
