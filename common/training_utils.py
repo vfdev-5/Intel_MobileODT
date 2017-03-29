@@ -4,10 +4,16 @@ import numpy as np
 import cv2
 
 from keras.preprocessing.image import random_rotation, random_shift, flip_axis
+from keras.callbacks import ModelCheckpoint
 
 # Project
 from data_utils import test_ids, type_to_index, type_1_ids, type_2_ids, type_3_ids
 from image_utils import get_image_data
+from metrics import jaccard_index
+
+# Local keras-contrib:
+from preprocessing.image.generators import ImageMaskGenerator
+from preprocessing.image.iterators import ImageMaskIterator
 
 
 def get_trainval_id_type_lists(val_split=0.3, type_ids=(type_1_ids, type_2_ids, type_3_ids)):
@@ -69,29 +75,6 @@ def get_trainval_id_type_lists2(annotations, val_split=0.3):
     return train_id_type_list, val_id_type_list
 
 
-def get_test_id_type_list():
-    return [(image_id, 'Test') for image_id in test_ids]
-
-
-def get_test_id_type_list2(annotations):
-    trainval_id_type_list = []
-    for annotation in annotations:
-        image_name = annotation['filename']
-        image_id = os.path.basename(image_name)[:-4]
-        image_type = os.path.split(os.path.dirname(image_name))[1]
-        trainval_id_type_list.append((image_id, image_type))
-
-    test_id_type_list = [(image_id, 'Test') for image_id in test_ids]
-    type_ids=(type_1_ids, type_2_ids, type_3_ids)
-    image_types = ["Type_1", "Type_2", "Type_3"]
-
-    for image_ids, image_type in zip(type_ids, image_types):    
-        for image_id in image_ids:
-            if (image_id, image_type) not in trainval_id_type_list:
-                test_id_type_list.append((image_id, image_type))
-    return test_id_type_list
-
-
 def compute_mean_std_images(image_id_type_list, output_size=(224, 224), feature_wise=False, verbose=0):
     """
     Method to compute mean/std input image
@@ -126,6 +109,124 @@ def compute_mean_std_images(image_id_type_list, output_size=(224, 224), feature_
         std_image = np.sqrt(std_image)
     return mean_image, std_image
 
+
+### Segmentation
+
+def segmentation_xy_provider(image_id_type_list, 
+                image_size=(224, 224), 
+                test_mode=False,
+                verbose=0):        
+    while True:
+        for i, (image_id, image_type) in enumerate(image_id_type_list):
+            if verbose > 0:
+                print("Image id/type:", image_id, image_type, "| counter=", counter)
+
+            img = get_image_data(image_id, image_type)
+            if img.dtype.kind is not 'u':
+                if verbose > 0:
+                    print("Image is corrupted. Id/Type:", image_id, image_type)
+                continue
+            img = cv2.resize(img, dsize=image_size[::-1])
+            img = img.transpose([2, 0, 1])
+            img = img.astype(np.float32) / 255.0
+
+            label = get_image_data(image_id + "_" + image_type, "trainval_label")
+            label = cv2.resize(label, dsize=image_size[::-1])
+            label = label.transpose([2, 0, 1])
+
+            if test_mode:
+                yield img, label, (image_id, image_type)
+            else:
+                yield img, label
+                
+        if test_mode:
+            return
+
+        
+def segmentation_train(model, 
+                       train_id_type_list, 
+                       val_id_type_list, 
+                       batch_size=16, nb_epochs=10, 
+                       image_size=(224, 224),
+                       samples_per_epoch=1024,
+                       nb_val_samples=256,
+                       save_prefix=""):
+    
+    samples_per_epoch = (samples_per_epoch // batch_size) * batch_size
+    nb_val_samples = (nb_val_samples // batch_size) * batch_size
+
+    if not os.path.exists('weights'):
+        os.mkdir('weights')
+
+    weights_filename = os.path.join("weights", save_prefix + "{epoch:02d}-{val_loss:.4f}.h5")
+    model_checkpoint = ModelCheckpoint(weights_filename, monitor='loss', save_best_only=True)
+
+    print("Training parameters: ", batch_size, nb_epochs, samples_per_epoch, nb_val_samples)
+    
+    train_gen = ImageMaskGenerator(featurewise_center=True,
+                                   featurewise_std_normalization=True,
+                                   rotation_range=90., 
+                                   width_shift_range=0.15, height_shift_range=0.15,
+                                   shear_range=3.14/6.0,
+                                   zoom_range=0.25,
+                                   channel_shift_range=0.1,
+                                   horizontal_flip=True,
+                                   vertical_flip=True)
+    val_gen = ImageMaskGenerator(rotation_range=90., 
+                                 horizontal_flip=True,
+                                 vertical_flip=True)
+    
+    train_gen.fit(segmentation_xy_provider(train_id_type_list, test_mode=True, image_size=image_size),
+                  len(train_id_type_list), 
+                  augment=True, 
+                  save_to_dir=GENERATED_DATA,
+                  save_prefix=save_prefix,
+                  batch_size=4,
+                  verbose=1)
+   
+    history = model.fit_generator(
+        train_gen.flow(segmentation_xy_provider(train_id_type_list, image_size=image_size), 
+                       len(train_id_type_list),
+                       batch_size=batch_size),
+        samples_per_epoch=samples_per_epoch,
+        nb_epoch=nb_epochs,
+        validation_data=val_gen.flow(xy_provider(val_id_type_list), 
+                       len(val_id_type_list),
+                       batch_size=batch_size),
+        nb_val_samples=nb_val_samples,
+        callbacks=[model_checkpoint],
+        verbose=1,
+    )
+
+    return history
+
+
+def segmentation_validate(model, val_id_type_list, batch_size=16, image_size=(224, 224)):
+      
+    val_iter = ImageMaskIterator(segmentation_xy_provider(val_id_type_list, test_mode=True, image_size=image_size), 
+                                  len(val_id_type_list), 
+                                  None, # image generator
+                                  batch_size=batch_size,
+                                  data_format='channels_first')
+    
+    mean_jaccard_index = 0.0
+    total_counter = 0 
+    for x, y_true, info in val_iter:           
+        s = y_true.shape[0]
+        total_counter += s
+        y_pred = model.predict(x)
+        ji = jaccard_index(y_true, y_pred)
+        mean_jaccard_index += s * ji
+        print("--", total_counter, "batch jaccard index : ", ji)
+
+    if total_counter == 0:
+        total_counter += 1
+
+    mean_jaccard_index *= 1.0 / total_counter   
+    print("Mean jaccard index : ", mean_jaccard_index)
+       
+
+### Classification 
 
 def data_augmentation(X, Y,
                       hflip=True, vflip=True,
@@ -214,3 +315,6 @@ def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mo
 
         if test_mode:
             break
+
+            
+            

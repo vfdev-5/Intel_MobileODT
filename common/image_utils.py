@@ -12,14 +12,14 @@ def get_image_data(image_id, image_type):
     """
     Method to get image data as np.array specifying image id and type
     """
-    if image_type == 'label':
+    if 'label' in image_type and 'gray' not in image_type:
         return np.load(get_filename(image_id, image_type))['arr_0']
     return _get_image_data_pil(image_id, image_type)
 
 
 def imwrite(img, image_id, image_type):
     output_filename = get_filename(image_id, image_type)
-    if image_type == 'label':
+    if 'label' in image_type and 'gray' not in image_type:
         np.savez(output_filename, img)
     else:
         pil_image = Image.fromarray(img)
@@ -84,7 +84,7 @@ def generate_label_gray_images(annotations):
             mask = label_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] == 0            
             label_image[pt1[1]:pt2[1], pt1[0]:pt2[0]] = index * mask + label_image[pt1[1]:pt2[1], pt1[0]:pt2[0]]
         
-        imwrite(label_image, image_id + '_' + image_type, 'label_gray')  
+        imwrite(label_image, image_id + '_' + image_type, 'trainval_label_gray')  
         
 
 def generate_label_images(annotations):
@@ -111,4 +111,4 @@ def generate_label_images(annotations):
             pt2 = (_clamp(pt1[0] + int(label['width']), w), _clamp(pt1[1] + int(label['height']), h))
             label_image[pt1[1]:pt2[1], pt1[0]:pt2[0], index] = 1
         
-        imwrite(label_image, image_id + '_' + image_type, 'label')    
+        imwrite(label_image, image_id + '_' + image_type, 'trainval_label')    

@@ -62,11 +62,14 @@ def get_filename(image_id, image_type):
           image_type == "AType_2" or \
           image_type == "AType_3":
         data_path = os.path.join(ADDITIONAL_DATA, image_type[1:])
-    elif image_type == 'label':
-        data_path = os.path.join(GENERATED_DATA, 'labels')
+    elif image_type == 'trainval_label':
+        data_path = os.path.join(GENERATED_DATA, 'trainval_labels')
         ext = 'npz'
-    elif image_type == 'label_gray':
-        data_path = os.path.join(GENERATED_DATA, 'labels_gray')
+    elif image_type == 'pred_label':
+        data_path = os.path.join(GENERATED_DATA, 'pred_labels')
+        ext = 'npz'        
+    elif image_type == 'trainval_label_gray':
+        data_path = os.path.join(GENERATED_DATA, 'trainval_labels_gray')
         ext = 'png'
     else:
         raise Exception("Image type '%s' is not recognized" % image_type)
