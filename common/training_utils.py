@@ -4,10 +4,11 @@ import numpy as np
 import cv2
 
 from keras.preprocessing.image import random_rotation, random_shift, flip_axis
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 
 # Project
 from data_utils import test_ids, type_to_index, type_1_ids, type_2_ids, type_3_ids
+from data_utils import GENERATED_DATA
 from image_utils import get_image_data
 from metrics import jaccard_index
 
@@ -112,6 +113,16 @@ def compute_mean_std_images(image_id_type_list, output_size=(224, 224), feature_
 
 ### Segmentation
 
+def random_rgb_to_green(x, y):
+    if np.random.rand() > 0.5:
+        xt = x.copy()
+        xt[0, :, :] = 0 # Red -> 0
+        xt[2, :, :] = 0 # Blue -> 0
+    else:
+        xt = x
+    return xt, y
+
+
 def segmentation_xy_provider(image_id_type_list, 
                 image_size=(224, 224), 
                 test_mode=False,
@@ -119,7 +130,7 @@ def segmentation_xy_provider(image_id_type_list,
     while True:
         for i, (image_id, image_type) in enumerate(image_id_type_list):
             if verbose > 0:
-                print("Image id/type:", image_id, image_type, "| counter=", counter)
+                print("Image id/type:", image_id, image_type, "| counter=", i)
 
             img = get_image_data(image_id, image_type)
             if img.dtype.kind is not 'u':
@@ -142,6 +153,10 @@ def segmentation_xy_provider(image_id_type_list,
         if test_mode:
             return
 
+
+def exp_decay(epoch, lr=1e-3, a=0.925):
+    return lr * np.exp(-(1.0 - a) * epoch)
+
         
 def segmentation_train(model, 
                        train_id_type_list, 
@@ -160,10 +175,12 @@ def segmentation_train(model,
 
     weights_filename = os.path.join("weights", save_prefix + "{epoch:02d}-{val_loss:.4f}.h5")
     model_checkpoint = ModelCheckpoint(weights_filename, monitor='loss', save_best_only=True)
+    lrate = LearningRateScheduler(exp_decay)
 
     print("Training parameters: ", batch_size, nb_epochs, samples_per_epoch, nb_val_samples)
     
-    train_gen = ImageMaskGenerator(featurewise_center=True,
+    train_gen = ImageMaskGenerator(pipeline=('random_transform', random_rgb_to_green, 'standardize'),
+                                   featurewise_center=True,
                                    featurewise_std_normalization=True,
                                    rotation_range=90., 
                                    width_shift_range=0.15, height_shift_range=0.15,
@@ -190,11 +207,11 @@ def segmentation_train(model,
                        batch_size=batch_size),
         samples_per_epoch=samples_per_epoch,
         nb_epoch=nb_epochs,
-        validation_data=val_gen.flow(xy_provider(val_id_type_list), 
+        validation_data=val_gen.flow(segmentation_xy_provider(val_id_type_list),
                        len(val_id_type_list),
                        batch_size=batch_size),
         nb_val_samples=nb_val_samples,
-        callbacks=[model_checkpoint],
+        callbacks=[model_checkpoint, lrate],
         verbose=1,
     )
 
@@ -205,7 +222,7 @@ def segmentation_validate(model, val_id_type_list, batch_size=16, image_size=(22
       
     val_iter = ImageMaskIterator(segmentation_xy_provider(val_id_type_list, test_mode=True, image_size=image_size), 
                                   len(val_id_type_list), 
-                                  None, # image generator
+                                  None,  # image generator
                                   batch_size=batch_size,
                                   data_format='channels_first')
     
@@ -316,5 +333,3 @@ def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mo
         if test_mode:
             break
 
-            
-            

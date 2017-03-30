@@ -89,27 +89,27 @@ class ImageDataIterator(Iterator):
         else:
             self._process = self._default_image_data_generator_process
             
-    def _empty_process(img, target):
+    def _empty_process(self, img, target):
         return img, target
             
-    def _default_image_data_generator_process(img, target):
+    def _default_image_data_generator_process(self, img, target):
         img = self.image_data_generator.random_transform(img)
-        return self.image_data_generator.standardize(img)        
+        return self.image_data_generator.standardize(img), target
     
-    def _check_x_format(x, **kwargs):
+    def _check_x_format(self, x, **kwargs):
         ImageDataIterator._check_img_format(x, **kwargs)
 
-    def _check_y_format(y, **kwargs):
+    def _check_y_format(self, y, **kwargs):
         # y target can be of any type
         #
-        # Override this method when inherit of ImageDataIterator
+        # Override this method when inherits of ImageDataIterator
         #
         pass
     
-    def _create_y_batch(current_batch_size, x, y):
+    def _create_y_batch(self, current_batch_size, x, y):
         # Method to create a batch of y targets
         #
-        # Override this method when inherit of ImageDataIterator
+        # Override this method when inherits of ImageDataIterator
         #
         return np.empty((current_batch_size,), dtype=object)
         
@@ -139,7 +139,7 @@ class ImageDataIterator(Iterator):
             x, y, info = ret if len(ret) > 2 else (ret[0], ret[1], None)
 
         batch_x = np.zeros((current_batch_size,) + x.shape, dtype=K.floatx())
-        batch_y = _create_y_batch(current_batch_size, x=x, y=y)
+        batch_y = self._create_y_batch(current_batch_size, x=x, y=y)
         batch_info = np.empty((current_batch_size,), dtype=object)
         batch_x[0], batch_y[0] = self._process(x, y)
         batch_info[0] = info
@@ -204,13 +204,13 @@ class ImageMaskIterator(ImageDataIterator):
     """
 
     def __init__(self, *args, **kwargs):
-        super(ImageMaskIterator, self).__init__(n, batch_size, shuffle, seed)
+        super(ImageMaskIterator, self).__init__(*args, **kwargs)
 
-    def _check_x_format(x, **kwargs):
+    def _check_x_format(self, x, **kwargs):
         ImageDataIterator._check_img_format(x, **kwargs)
 
-    def _check_y_format(y, **kwargs):
+    def _check_y_format(self, y, **kwargs):
         ImageDataIterator._check_img_format(y, **kwargs)
         
-    def _create_y_batch(current_batch_size, x, y):
+    def _create_y_batch(self, current_batch_size, x, y):
         return np.zeros((current_batch_size,) + y.shape, dtype=K.floatx())
