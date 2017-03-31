@@ -11,6 +11,8 @@ from data_utils import test_ids, type_to_index, type_1_ids, type_2_ids, type_3_i
 from data_utils import GENERATED_DATA
 from image_utils import get_image_data, imwrite
 from metrics import jaccard_index
+from xy_providers import cached_image_mask_provider as xy_provider
+
 
 # Local keras-contrib:
 from preprocessing.image.generators import ImageMaskGenerator
@@ -54,25 +56,25 @@ def get_trainval_id_type_lists(val_split=0.3, type_ids=(type_1_ids, type_2_ids, 
 
 def get_trainval_id_type_lists2(annotations, val_split=0.3):
     n = len(annotations)
-    np.random.shuffle(annotations)  
+    np.random.shuffle(annotations)
     ll = int(n * (1.0 - val_split))
     train_annotations = annotations[:ll]
     val_annotations = annotations[ll:]
 
-    train_id_type_list = [] 
+    train_id_type_list = []
     for i, annotation in enumerate(train_annotations):
         image_name = annotation['filename']
         image_id = os.path.basename(image_name)[:-4]
         image_type = os.path.split(os.path.dirname(image_name))[1]
         train_id_type_list.append((image_id, image_type))
-        
+
     val_id_type_list = []
     for i, annotation in enumerate(val_annotations):
         image_name = annotation['filename']
         image_id = os.path.basename(image_name)[:-4]
         image_type = os.path.split(os.path.dirname(image_name))[1]
         val_id_type_list.append((image_id, image_type))
-    
+
     return train_id_type_list, val_id_type_list
 
 
@@ -123,109 +125,20 @@ def random_rgb_to_green(x, y):
     return xt, y
 
 
-def segmentation_xy_provider(image_id_type_list, 
-                image_size=(224, 224), 
-                test_mode=False,
-                save_to_dir=None,
-                verbose=0):        
-    while True:
-        for i, (image_id, image_type) in enumerate(image_id_type_list):
-            if verbose > 0:
-                print("Image id/type:", image_id, image_type, "| counter=", i)
-
-                
-            img = None
-            label = None  
-            output_filename = 'preproc_img_label_'+ image_id + "_" + image_type + '.npz'
-            output_filename = os.path.join(save_to_dir, output_filename) if save_to_dir is not None else output_filename 
-            if os.path.exists(output_filename):
-                print("-- Load preprocessed image")
-                data = np.load(output_filename)
-                img = data['image']
-                label = data['label']
-            else:
-                img = get_image_data(image_id, image_type)
-                if img.dtype.kind is not 'u':
-                    if verbose > 0:
-                        print("Image is corrupted. Id/Type:", image_id, image_type)
-                    continue
-                img = cv2.resize(img, dsize=image_size[::-1])
-                img = img.transpose([2, 0, 1])
-                img = img.astype(np.float32) / 255.0
-
-                label = get_image_data(image_id + "_" + image_type, "trainval_label")
-                label = cv2.resize(label, dsize=image_size[::-1])
-                label = label.transpose([2, 0, 1])
-            
-                if save_to_dir is not None:
-                    if not os.path.exists(save_to_dir):
-                        os.makedirs(save_to_dir)
-                    np.savez(output_filename, image=img, label=label)
-            
-            if test_mode:
-                yield img, label, (image_id, image_type)
-            else:
-                yield img, label
-                
-        if test_mode:
-            return
-
-        
-RAM_CACHE = {}
-
-def segmentation_xy_provider_RAM_cache(image_id_type_list, 
-                image_size=(224, 224), 
-                test_mode=False,
-                verbose=0):        
-    while True:
-        for i, (image_id, image_type) in enumerate(image_id_type_list):
-            if verbose > 0:
-                print("Image id/type:", image_id, image_type, "| counter=", i)
-                
-            img = None
-            label = None  
-            key = image_id + '_' + image_type                        
-            if key in RAM_CACHE:
-                if verbose > 0:
-                    print("-- Load from RAM")
-                img, label = RAM_CACHE[key]
-            else:
-                if verbose > 0:
-                    print("-- Load from disk")
-                img = get_image_data(image_id, image_type)
-                if img.dtype.kind is not 'u':
-                    if verbose > 0:
-                        print("Image is corrupted. Id/Type:", image_id, image_type)
-                    continue
-                img = cv2.resize(img, dsize=image_size[::-1])
-                img = img.transpose([2, 0, 1])
-                img = img.astype(np.float32) / 255.0
-                label = get_image_data(image_id + "_" + image_type, "trainval_label")
-                label = cv2.resize(label, dsize=image_size[::-1])
-                label = label.transpose([2, 0, 1])
-                RAM_CACHE[key] = (img, label)
-            if test_mode:
-                yield img, label, (image_id, image_type)
-            else:
-                yield img, label
-                
-        if test_mode:
-            return        
-        
-
 def exp_decay(epoch, lr=1e-3, a=0.925):
     return lr * np.exp(-(1.0 - a) * epoch)
 
-        
-def segmentation_train(model, 
-                       train_id_type_list, 
-                       val_id_type_list, 
-                       batch_size=16, nb_epochs=10, 
+
+def segmentation_train(model,
+                       train_id_type_list,
+                       val_id_type_list,
+                       batch_size=16, nb_epochs=10,
                        image_size=(224, 224),
                        samples_per_epoch=1024,
                        nb_val_samples=256,
+                       xy_provider_cache=None,
                        save_prefix="", verbose=1):
-    
+
     samples_per_epoch = (samples_per_epoch // batch_size) * batch_size
     nb_val_samples = (nb_val_samples // batch_size) * batch_size
 
@@ -237,45 +150,52 @@ def segmentation_train(model,
     lrate = LearningRateScheduler(exp_decay)
 
     print("-- Training parameters: ", batch_size, nb_epochs, samples_per_epoch, nb_val_samples)
-    
+
     train_gen = ImageMaskGenerator(pipeline=('random_transform', random_rgb_to_green, 'standardize'),
                                    featurewise_center=True,
                                    featurewise_std_normalization=True,
-                                   rotation_range=90., 
+                                   rotation_range=90.,
                                    width_shift_range=0.15, height_shift_range=0.15,
                                    shear_range=3.14/6.0,
                                    zoom_range=0.25,
                                    channel_shift_range=0.1,
                                    horizontal_flip=True,
                                    vertical_flip=True)
-    val_gen = ImageMaskGenerator(rotation_range=90., 
+    val_gen = ImageMaskGenerator(rotation_range=90.,
                                  horizontal_flip=True,
                                  vertical_flip=True)
-    
+
     # create an alias
-    xy_provider = segmentation_xy_provider_RAM_cache
-    
     print("-- Fit stats of train dataset")
-    train_gen.fit(xy_provider(train_id_type_list, 
-                              test_mode=True, 
+    train_gen.fit(xy_provider(train_id_type_list,
+                              test_mode=True,
+                              cache=xy_provider_cache,
                               image_size=image_size),
-                  len(train_id_type_list), 
-                  augment=True, 
+                  len(train_id_type_list),
+                  augment=True,
                   save_to_dir=GENERATED_DATA,
                   save_prefix=save_prefix,
                   batch_size=4,
                   verbose=verbose)
-    
+
     print("-- Fit model")
     history = model.fit_generator(
-        train_gen.flow(xy_provider(train_id_type_list, image_size=image_size,verbose=1), 
-                       len(train_id_type_list),
+        train_gen.flow(xy_provider(train_id_type_list,
+                                   image_size=image_size,
+                                   cache=xy_provider_cache,
+                                   verbose=1),
+                       # Ensure that all batches have the same size
+                       (len(train_id_type_list) // batch_size) * batch_size,
                        batch_size=batch_size),
         samples_per_epoch=samples_per_epoch,
         nb_epoch=nb_epochs,
-        validation_data=val_gen.flow(xy_provider(val_id_type_list, image_size=image_size,verbose=1),
-                       len(val_id_type_list),
-                       batch_size=batch_size),
+        validation_data=val_gen.flow(xy_provider(val_id_type_list,
+                                                 image_size=image_size,
+                                                 cache=xy_provider_cache,
+                                                 verbose=1),
+                                     # Ensure that all batches have the same size
+                                     (len(val_id_type_list) // batch_size) * batch_size,
+                                     batch_size=batch_size),
         nb_val_samples=nb_val_samples,
         callbacks=[model_checkpoint, lrate],
         verbose=verbose,
@@ -284,32 +204,34 @@ def segmentation_train(model,
     return history
 
 
-def segmentation_validate(model, val_id_type_list, batch_size=16, image_size=(224, 224)):
-    
+def segmentation_validate(model, val_id_type_list, batch_size=16, xy_provider_cache=None, image_size=(224, 224)):
+
     # create an alias
-    xy_provider = segmentation_xy_provider_RAM_cache
-    val_iter = ImageMaskIterator(xy_provider(val_id_type_list, test_mode=True, image_size=image_size), 
-                                 len(val_id_type_list), 
+    val_iter = ImageMaskIterator(xy_provider(val_id_type_list,
+                                             test_mode=True,
+                                             cache=xy_provider_cache,
+                                             image_size=image_size),
+                                 len(val_id_type_list),
                                  None,  # image generator
                                  batch_size=batch_size,
                                  data_format='channels_first')
-    
+
     mean_jaccard_index = 0.0
-    total_counter = 0 
-    for x, y_true, info in val_iter:           
+    total_counter = 0
+    for x, y_true, info in val_iter:
         s = y_true.shape[0]
         total_counter += s
         y_pred = model.predict(x)
         ji = jaccard_index(y_true, y_pred)
         mean_jaccard_index += s * ji
-        print("--", total_counter, "batch jaccard index : ", ji)
+        print("--", total_counter, "batch jaccard index : ", ji, " | info:", info)
 
     if total_counter == 0:
         total_counter += 1
 
-    mean_jaccard_index *= 1.0 / total_counter   
+    mean_jaccard_index *= 1.0 / total_counter
     print("Mean jaccard index : ", mean_jaccard_index)
-       
+
 
 ### Classification 
 

@@ -8,7 +8,7 @@ import pandas as pd
 # Project
 from data_utils import test_ids, type_to_index, type_1_ids, type_2_ids, type_3_ids
 from image_utils import imwrite, get_image_data
-from training_utils import RAM_CACHE
+from xy_providers import cached_image_provider as xy_provider
 
 # Local keras-contrib:
 from preprocessing.image.iterators import ImageMaskIterator
@@ -39,53 +39,17 @@ def get_test_id_type_list2(annotations):
 
 ### Segmentation
 
-def segmentation_xy_provider(image_id_type_list, image_size=(224, 224), verbose=0):        
+def segmentation_predict(model,
+                         test_id_type_list,
+                         batch_size=16,
+                         xy_provider_cache=None,
+                         image_size=(224, 224)):
     
-    for i, (image_id, image_type) in enumerate(image_id_type_list):
-        if verbose > 0:
-            print("Image id/type:", image_id, image_type, "| counter=", counter)
-            
-        img = get_image_data(image_id, image_type)
-        if img.dtype.kind is not 'u':
-            if verbose > 0:
-                print("Image is corrupted. Id/Type:", image_id, image_type)
-            continue
-        img = cv2.resize(img, dsize=image_size[::-1])
-        img = img.transpose([2, 0, 1])
-        img = img.astype(np.float32) / 255.0
-
-        yield img, img, (image_id, image_type)
-      
-    
-def segmentation_xy_provider_RAM_cache(image_id_type_list, image_size=(224, 224), verbose=0):        
-    
-    for i, (image_id, image_type) in enumerate(image_id_type_list):
-        if verbose > 0:
-            print("Image id/type:", image_id, image_type, "| counter=", counter)
-
-        key = image_id + '_' + image_type                        
-        if key in RAM_CACHE:
-            img, label = RAM_CACHE[key]
-        else:
-            img = get_image_data(image_id, image_type)
-            if img.dtype.kind is not 'u':
-                if verbose > 0:
-                    print("Image is corrupted. Id/Type:", image_id, image_type)
-                continue
-            img = cv2.resize(img, dsize=image_size[::-1])
-            img = img.transpose([2, 0, 1])
-            img = img.astype(np.float32) / 255.0
-            RAM_CACHE[key] = (img, label)
-
-        yield img, img, (image_id, image_type)
-
-        
-def segmentation_predict(model, test_id_type_list, batch_size=16, image_size=(224, 224)):
-    
-    xy_provider = segmentation_xy_provider_RAM_cache
-    test_iter = ImageMaskIterator(xy_provider(test_id_type_list, image_size=image_size), 
+    test_iter = ImageMaskIterator(xy_provider(test_id_type_list,
+                                              image_size=image_size,
+                                              cache=xy_provider_cache),
                                   len(test_id_type_list), 
-                                  None, # image generator
+                                  None,  # image generator
                                   batch_size=batch_size,
                                   data_format='channels_first')
     
