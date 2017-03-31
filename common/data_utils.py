@@ -52,6 +52,7 @@ def get_filename(image_id, image_type):
     Method to get image file path from its id and type
     """
     ext = 'jpg'
+    check_dir = False
     if image_type == "Type_1" or \
         image_type == "Type_2" or \
         image_type == "Type_3":
@@ -65,16 +66,19 @@ def get_filename(image_id, image_type):
     elif image_type == 'trainval_label':
         data_path = os.path.join(GENERATED_DATA, 'trainval_labels')
         ext = 'npz'
+        check_dir = True
     elif image_type == 'pred_label':
         data_path = os.path.join(GENERATED_DATA, 'pred_labels')
-        ext = 'npz'        
+        ext = 'npz'     
+        check_dir = True
     elif image_type == 'trainval_label_gray':
         data_path = os.path.join(GENERATED_DATA, 'trainval_labels_gray')
         ext = 'png'
+        check_dir = True
     else:
         raise Exception("Image type '%s' is not recognized" % image_type)
 
-    if not os.path.exists(data_path):
+    if check_dir and not os.path.exists(data_path):
         os.makedirs(data_path)
 
     return os.path.join(data_path, "{}.{}".format(image_id, ext))
