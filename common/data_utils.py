@@ -63,13 +63,49 @@ def get_filename(image_id, image_type):
           image_type == "AType_2" or \
           image_type == "AType_3":
         data_path = os.path.join(ADDITIONAL_DATA, image_type[1:])
-    elif image_type == 'trainval_label':
-        data_path = os.path.join(GENERATED_DATA, 'trainval_labels')
+    elif image_type == 'trainval_label_0':
+        # Manual os/servix segmentation
+        data_path = os.path.join(GENERATED_DATA, 'trainval_labels_0')
         ext = 'npz'
         check_dir = True
-    elif image_type == 'pred_label':
-        data_path = os.path.join(GENERATED_DATA, 'pred_labels')
+    elif image_type == 'os_cervix_label_1':
+        # Results of U-net predictions of os/cervix segmentation, seed 2017
+        data_path = os.path.join(GENERATED_DATA, 'os_cervix_labels_1')
+        ext = 'npz'
+        check_dir = True
+    elif image_type == 'os_cervix_label_2':
+        # Results of U-net predictions of os/cervix segmentation, seed 54321
+        data_path = os.path.join(GENERATED_DATA, 'os_cervix_labels_2')
+        ext = 'npz'
+        check_dir = True
+    elif image_type == 'os_cervix_label':
+        # Results of ensembling of U-net predictions of os/cervix segmentation
+        data_path = os.path.join(GENERATED_DATA, 'os_cervix_labels_final')
         ext = 'npz'     
+        check_dir = True
+    elif image_type == 'Type_1_os' or \
+          image_type == 'Type_2_os' or \
+          image_type == 'Type_3_os':
+        # Original Image masked with 'os_cervix_label':os and cropped/resized to 224x224
+        t = image_type[:6]
+        data_path = os.path.join(GENERATED_DATA, 'train', t, 'os')
+        check_dir = True
+    elif image_type == 'Test_os':
+        # Original Image masked with 'os_cervix_label':os and cropped/resized to 224x224
+        t = image_type[:6]
+        data_path = os.path.join(GENERATED_DATA, 'test', 'os')
+        check_dir = True
+    elif image_type == 'Type_1_cervix' or \
+          image_type == 'Type_2_cervix' or \
+          image_type == 'Type_3_cervix':
+        # Original Image masked with 'os_cervix_label':cervix and cropped/resized to 224x224
+        t = image_type[:6]
+        data_path = os.path.join(GENERATED_DATA, 'train', t, 'cervix')
+        check_dir = True
+    elif image_type == 'Test_cervix':
+        # Original Image masked with 'os_cervix_label':cervix and cropped/resized to 224x224
+        t = image_type[:6]
+        data_path = os.path.join(GENERATED_DATA, 'test', 'cervix')
         check_dir = True
     elif image_type == 'trainval_label_gray':
         data_path = os.path.join(GENERATED_DATA, 'trainval_labels_gray')

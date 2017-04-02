@@ -50,7 +50,7 @@ if __name__ == "__main__":
     sloth_annotations_filename = os.path.join(RESOURCES_PATH, 'cervix_os.json')
     annotations = get_annotations(sloth_annotations_filename)
     train_id_type_list, val_id_type_list = get_trainval_id_type_lists2(annotations=annotations, val_split=0.25)
-    print "Total : %s, Train : %s, Val : %s" % (len(annotations), len(train_id_type_list), len(val_id_type_list))
+    print("Total : %s, Train : %s, Val : %s" % (len(annotations), len(train_id_type_list), len(val_id_type_list)))
         
     print("\n {} - Get U-Net model ...".format(datetime.datetime.now()))
     unet = get_unet(input_shape=(3, 224, 224), n_classes=2)

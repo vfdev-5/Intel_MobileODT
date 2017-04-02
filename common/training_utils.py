@@ -133,6 +133,7 @@ def segmentation_train(model,
                        train_id_type_list,
                        val_id_type_list,
                        batch_size=16, nb_epochs=10,
+                       lrate_decay_f=exp_decay,
                        image_size=(224, 224),
                        samples_per_epoch=1024,
                        nb_val_samples=256,
@@ -145,12 +146,15 @@ def segmentation_train(model,
     if not os.path.exists('weights'):
         os.mkdir('weights')
 
-    weights_filename = os.path.join("weights", save_prefix + "{epoch:02d}-{val_loss:.4f}.h5")
+    weights_filename = os.path.join("weights", save_prefix + "_{epoch:02d}-{val_loss:.4f}.h5")
     model_checkpoint = ModelCheckpoint(weights_filename, monitor='loss', save_best_only=True)
-    lrate = LearningRateScheduler(exp_decay)
+    lrate = LearningRateScheduler(lrate_decay_f)
 
     print("-- Training parameters: ", batch_size, nb_epochs, samples_per_epoch, nb_val_samples)
 
+    xy_provider_verbose = 0
+    xy_provider_label_type = 'trainval_label_0'
+    
     train_gen = ImageMaskGenerator(pipeline=('random_transform', random_rgb_to_green, 'standardize'),
                                    featurewise_center=True,
                                    featurewise_std_normalization=True,
@@ -168,6 +172,7 @@ def segmentation_train(model,
     # create an alias
     print("-- Fit stats of train dataset")
     train_gen.fit(xy_provider(train_id_type_list,
+                              label_type=xy_provider_label_type,
                               test_mode=True,
                               cache=xy_provider_cache,
                               image_size=image_size),
@@ -181,18 +186,20 @@ def segmentation_train(model,
     print("-- Fit model")
     history = model.fit_generator(
         train_gen.flow(xy_provider(train_id_type_list,
+                                   label_type=xy_provider_label_type,
                                    image_size=image_size,
                                    cache=xy_provider_cache,
-                                   verbose=1),
+                                   verbose=xy_provider_verbose),
                        # Ensure that all batches have the same size
                        (len(train_id_type_list) // batch_size) * batch_size,
                        batch_size=batch_size),
         samples_per_epoch=samples_per_epoch,
         nb_epoch=nb_epochs,
         validation_data=val_gen.flow(xy_provider(val_id_type_list,
+                                                 label_type=xy_provider_label_type,
                                                  image_size=image_size,
                                                  cache=xy_provider_cache,
-                                                 verbose=1),
+                                                 verbose=xy_provider_verbose),
                                      # Ensure that all batches have the same size
                                      (len(val_id_type_list) // batch_size) * batch_size,
                                      batch_size=batch_size),
@@ -200,6 +207,11 @@ def segmentation_train(model,
         callbacks=[model_checkpoint, lrate],
         verbose=verbose,
     )
+    
+    # save the last
+    val_loss = history.history['val_loss'][-1]
+    weights_filename = weights_filename.format(epoch=nb_epochs, val_loss=val_loss)
+    unet.save_weights(weights_filename)
 
     return history
 
@@ -208,6 +220,7 @@ def segmentation_validate(model, val_id_type_list, batch_size=16, xy_provider_ca
 
     # create an alias
     val_iter = ImageMaskIterator(xy_provider(val_id_type_list,
+                                             label_type='trainval_label_0',
                                              test_mode=True,
                                              cache=xy_provider_cache,
                                              image_size=image_size),

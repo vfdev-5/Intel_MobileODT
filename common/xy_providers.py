@@ -24,6 +24,7 @@ def image_provider(image_id_type_list, image_size=(224, 224), verbose=0):
 
 
 def image_mask_provider(image_id_type_list,
+                        label_type,
                         image_size=(224, 224),
                         test_mode=False,
                         save_to_dir=None,
@@ -50,7 +51,7 @@ def image_mask_provider(image_id_type_list,
                 img = img.transpose([2, 0, 1])
                 img = img.astype(np.float32) / 255.0
 
-                label = get_image_data(image_id + "_" + image_type, "trainval_label")
+                label = get_image_data(image_id + "_" + image_type, label_type)
                 label = cv2.resize(label, dsize=image_size[::-1])
                 label = label.transpose([2, 0, 1])
 
@@ -99,6 +100,7 @@ class ImageMaskCache(object):
 
 
 def cached_image_mask_provider(image_id_type_list,
+                               label_type,
                                image_size=(224, 224),
                                test_mode=False,
                                cache=None,
@@ -137,7 +139,7 @@ def cached_image_mask_provider(image_id_type_list,
                 img = cv2.resize(img, dsize=image_size[::-1])
                 img = img.transpose([2, 0, 1])
                 img = img.astype(np.float32) / 255.0
-                label = get_image_data(image_id + "_" + image_type, "trainval_label")
+                label = get_image_data(image_id + "_" + image_type, label_type)
                 label = cv2.resize(label, dsize=image_size[::-1])
                 label = label.transpose([2, 0, 1])
 
