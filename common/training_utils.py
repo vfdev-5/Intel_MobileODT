@@ -15,8 +15,8 @@ from xy_providers import cached_image_mask_provider as xy_provider
 
 
 # Local keras-contrib:
-from preprocessing.image.generators import ImageMaskGenerator
-from preprocessing.image.iterators import ImageMaskIterator
+from preprocessing.image.generators import ImageMaskGenerator, ImageDataGenerator
+from preprocessing.image.iterators import ImageMaskIterator, ImageDataIterator
 
 
 def get_trainval_id_type_lists(val_split=0.3, type_ids=(type_1_ids, type_2_ids, type_3_ids)):
@@ -113,7 +113,9 @@ def compute_mean_std_images(image_id_type_list, output_size=(224, 224), feature_
     return mean_image, std_image
 
 
-### Segmentation
+def exp_decay(epoch, lr=1e-3, a=0.925):
+    return lr * np.exp(-(1.0 - a) * epoch)
+
 
 def random_rgb_to_green(x, y):
     if np.random.rand() > 0.5:
@@ -124,21 +126,23 @@ def random_rgb_to_green(x, y):
         xt = x
     return xt, y
 
-
-def exp_decay(epoch, lr=1e-3, a=0.925):
-    return lr * np.exp(-(1.0 - a) * epoch)
+### Generic task
 
 
-def segmentation_train(model,
-                       train_id_type_list,
-                       val_id_type_list,
-                       batch_size=16, nb_epochs=10,
-                       lrate_decay_f=exp_decay,
-                       image_size=(224, 224),
-                       samples_per_epoch=1024,
-                       nb_val_samples=256,
-                       xy_provider_cache=None,
-                       save_prefix="", verbose=1):
+def generic_train(model,
+                  train_id_type_list,
+                  val_id_type_list,
+                  generator,
+                  xy_provider_label_type,
+                  batch_size=16,
+                  nb_epochs=10,
+                  lrate_decay_f=exp_decay,
+                  image_size=(224, 224),
+                  samples_per_epoch=1024,
+                  nb_val_samples=256,
+                  xy_provider_cache=None,
+                  save_prefix="",
+                  verbose=1):
 
     samples_per_epoch = (samples_per_epoch // batch_size) * batch_size
     nb_val_samples = (nb_val_samples // batch_size) * batch_size
@@ -153,21 +157,21 @@ def segmentation_train(model,
     print("-- Training parameters: ", batch_size, nb_epochs, samples_per_epoch, nb_val_samples)
 
     xy_provider_verbose = 0
-    xy_provider_label_type = 'trainval_label_0'
-    
-    train_gen = ImageMaskGenerator(pipeline=('random_transform', random_rgb_to_green, 'standardize'),
-                                   featurewise_center=True,
-                                   featurewise_std_normalization=True,
-                                   rotation_range=90.,
-                                   width_shift_range=0.15, height_shift_range=0.15,
-                                   shear_range=3.14/6.0,
-                                   zoom_range=0.25,
-                                   channel_shift_range=0.1,
-                                   horizontal_flip=True,
-                                   vertical_flip=True)
-    val_gen = ImageMaskGenerator(rotation_range=90.,
-                                 horizontal_flip=True,
-                                 vertical_flip=True)
+    # xy_provider_label_type = 'trainval_label_0'
+
+    train_gen = generator(pipeline=('random_transform', random_rgb_to_green, 'standardize'),
+                          featurewise_center=True,
+                          featurewise_std_normalization=True,
+                          rotation_range=90.,
+                          width_shift_range=0.15, height_shift_range=0.15,
+                          shear_range=3.14/6.0,
+                          zoom_range=0.25,
+                          channel_shift_range=0.1,
+                          horizontal_flip=True,
+                          vertical_flip=True)
+    val_gen = generator(rotation_range=90.,
+                        horizontal_flip=True,
+                        vertical_flip=True)
 
     # create an alias
     print("-- Fit stats of train dataset")
@@ -207,27 +211,33 @@ def segmentation_train(model,
         callbacks=[model_checkpoint, lrate],
         verbose=verbose,
     )
-    
+
     # save the last
     val_loss = history.history['val_loss'][-1]
     weights_filename = weights_filename.format(epoch=nb_epochs, val_loss=val_loss)
-    unet.save_weights(weights_filename)
+    model.save_weights(weights_filename)
 
     return history
 
 
-def segmentation_validate(model, val_id_type_list, batch_size=16, xy_provider_cache=None, image_size=(224, 224)):
+def generic_validate(model,
+                     val_id_type_list,
+                     generator,
+                     xy_provider_label_type,
+                     batch_size=16,
+                     xy_provider_cache=None,
+                     image_size=(224, 224)):
 
     # create an alias
-    val_iter = ImageMaskIterator(xy_provider(val_id_type_list,
-                                             label_type='trainval_label_0',
-                                             test_mode=True,
-                                             cache=xy_provider_cache,
-                                             image_size=image_size),
-                                 len(val_id_type_list),
-                                 None,  # image generator
-                                 batch_size=batch_size,
-                                 data_format='channels_first')
+    val_iter = generator(xy_provider(val_id_type_list,
+                                     label_type=xy_provider_label_type,
+                                     test_mode=True,
+                                     cache=xy_provider_cache,
+                                     image_size=image_size),
+                         len(val_id_type_list),
+                         None,  # image generator
+                         batch_size=batch_size,
+                         data_format='channels_first')
 
     mean_jaccard_index = 0.0
     total_counter = 0
@@ -245,8 +255,70 @@ def segmentation_validate(model, val_id_type_list, batch_size=16, xy_provider_ca
     mean_jaccard_index *= 1.0 / total_counter
     print("Mean jaccard index : ", mean_jaccard_index)
 
+# ##### Segmentation #####
 
-### Classification 
+
+def segmentation_train(model,
+                       train_id_type_list,
+                       val_id_type_list,
+                       batch_size=16,
+                       nb_epochs=10,
+                       lrate_decay_f=exp_decay,
+                       image_size=(224, 224),
+                       samples_per_epoch=1024,
+                       nb_val_samples=256,
+                       xy_provider_cache=None,
+                       save_prefix="",
+                       verbose=1):
+    return generic_train(model,
+                         train_id_type_list,
+                         val_id_type_list,
+                         generator=ImageMaskGenerator,
+                         xy_provider_label_type='trainval_label_0',
+                         batch_size=batch_size,
+                         nb_epochs=nb_epochs,
+                         lrate_decay_f=lrate_decay_f,
+                         image_size=image_size,
+                         samples_per_epoch=samples_per_epoch,
+                         nb_val_samples=nb_val_samples,
+                         xy_provider_cache=xy_provider_cache,
+                         save_prefix=save_prefix,
+                         verbose=verbose)
+
+
+# ##### Classification ####
+
+def classification_train(model,
+                         train_id_type_list,
+                         val_id_type_list,
+                         xy_provider_label_type,
+                         batch_size=16,
+                         nb_epochs=10,
+                         lrate_decay_f=exp_decay,
+                         image_size=(224, 224),
+                         samples_per_epoch=1024,
+                         nb_val_samples=256,
+                         xy_provider_cache=None,
+                         save_prefix="",
+                         verbose=1):
+
+    return generic_train(model,
+                         train_id_type_list,
+                         val_id_type_list,
+                         generator=ImageDataGenerator,
+                         xy_provider_label_type=xy_provider_label_type,
+                         batch_size=batch_size,
+                         nb_epochs=nb_epochs,
+                         lrate_decay_f=lrate_decay_f,
+                         image_size=image_size,
+                         samples_per_epoch=samples_per_epoch,
+                         nb_val_samples=nb_val_samples,
+                         xy_provider_cache=xy_provider_cache,
+                         save_prefix=save_prefix,
+                         verbose=verbose)
+
+### OLD
+
 
 def data_augmentation(X, Y,
                       hflip=True, vflip=True,
