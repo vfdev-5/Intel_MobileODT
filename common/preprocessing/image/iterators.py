@@ -73,7 +73,8 @@ class ImageDataIterator(Iterator):
 
         x, y, info = ret if len(ret) > 2 else (ret[0], ret[1], None)
         self._check_x_format(x, data_format=data_format)
-        self._check_y_format(y, data_format=data_format)
+        if y is not None:
+            self._check_y_format(y, data_format=data_format)
         self._first_xy_provider_ret = (x, y, info)
 
         super(ImageDataIterator, self).__init__(n, batch_size, shuffle, seed)
@@ -140,7 +141,8 @@ class ImageDataIterator(Iterator):
             x, y, info = ret if len(ret) > 2 else (ret[0], ret[1], None)
 
         batch_x = np.zeros((current_batch_size,) + x.shape, dtype=K.floatx())
-        batch_y = self._create_y_batch(current_batch_size, x=x, y=y)
+        batch_y = self._create_y_batch(current_batch_size, x=x, y=y) if y is not None \
+            else np.empty((current_batch_size, ), dtype=object)
         batch_info = np.empty((current_batch_size,), dtype=object)
         batch_x[0], batch_y[0] = self._process(x, y)
         batch_info[0] = info
@@ -149,7 +151,8 @@ class ImageDataIterator(Iterator):
             ret = next(self.xy_provider)
             x, y, info = ret if len(ret) > 2 else (ret[0], ret[1], None)
             self._check_x_format(x, data_format=self.data_format)
-            self._check_y_format(y, data_format=self.data_format)            
+            if y is not None:
+                self._check_y_format(y, data_format=self.data_format)
             batch_x[i + 1], batch_y[i + 1] = self._process(x, y)
             batch_info[i + 1] = info
 

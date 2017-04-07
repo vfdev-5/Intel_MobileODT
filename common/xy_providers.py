@@ -158,6 +158,9 @@ def cached_image_mask_provider(image_id_type_list,
 
 
 def cached_image_provider(image_id_type_list, image_size=(224, 224), cache=None, verbose=0):
+    if cache is None:
+        cache = DataCache(n_samples=500)
+
     for i, (image_id, image_type) in enumerate(image_id_type_list):
         if verbose > 0:
             print("Image id/type:", image_id, image_type, "| counter=", i)
@@ -174,9 +177,10 @@ def cached_image_provider(image_id_type_list, image_size=(224, 224), cache=None,
             img = cv2.resize(img, dsize=image_size[::-1])
             img = img.transpose([2, 0, 1])
             img = img.astype(np.float32) / 255.0
-            cache.put(key, (img, None))
+            if i == 0:
+                cache.put(key, (img, None))
 
-        yield img, img, (image_id, image_type)
+        yield img, None, (image_id, image_type)
 
 
 def cached_image_label_provider(image_id_type_list,

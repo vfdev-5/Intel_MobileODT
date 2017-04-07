@@ -241,15 +241,15 @@ def segmentation_validate(model,
 
     xy_provider = cached_image_mask_provider
     xy_provider_label_type = 'trainval_label_0'
-    val_iter = ImageMaskGenerator(xy_provider(val_id_type_list,
-                                              mask_type=xy_provider_label_type,
-                                              test_mode=True,
-                                              cache=xy_provider_cache,
-                                              image_size=image_size),
-                                  len(val_id_type_list),
-                                  None,  # image generator
-                                  batch_size=batch_size,
-                                  data_format='channels_first')
+    val_iter = ImageMaskIterator(xy_provider(val_id_type_list,
+                                             mask_type=xy_provider_label_type,
+                                             test_mode=True,
+                                             cache=xy_provider_cache,
+                                             image_size=image_size),
+                                 len(val_id_type_list),
+                                 None,  # image generator
+                                 batch_size=batch_size,
+                                 data_format='channels_first')
 
     mean_jaccard_index = 0.0
     total_counter = 0
@@ -372,13 +372,13 @@ def classification_validate(model,
                             xy_provider_cache=None):
 
     xy_provider = cached_image_label_provider
-    val_iter = ImageDataGenerator(xy_provider(val_id_type_list,
-                                              test_mode=True,
-                                              cache=xy_provider_cache),
-                                  len(val_id_type_list),
-                                  None,  # image generator
-                                  batch_size=batch_size,
-                                  data_format='channels_first')
+    val_iter = ImageDataIterator(xy_provider(val_id_type_list,
+                                             test_mode=True,
+                                             cache=xy_provider_cache),
+                                 len(val_id_type_list),
+                                 None,  # image generator
+                                 batch_size=batch_size,
+                                 data_format='channels_first')
 
     total_loss = 0.0
     total_counter = 0
