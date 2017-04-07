@@ -60,7 +60,12 @@ class ImageDataGenerator(KerasImageDataGenerator):
             batch_size=4,
             verbose=1)
 
-    val_gen = ImageDataGenerator() # Just an infinite image/mask generator
+    val_gen = ImageDataGenerator(featurewise_center=True,
+                                 featurewise_std_normalization=True) # Just an infinite image/mask generator
+
+    val_gen.mean = train_gen.mean
+    val_gen.std = train_gen.std
+    val_gen.principal_components = train_gen.principal_components
 
     history = model.fit_generator(
         train_gen.flow(xy_provider(train_image_ids), # Infinite generator is used
@@ -341,6 +346,9 @@ class ImageDataGenerator(KerasImageDataGenerator):
             if self.zca_whitening:
                 _total_x[counter*batch_size:(counter+1)*batch_size, :, :, :] = x
             counter += 1
+
+        if verbose == 1:
+            progbar.update(n_samples)
 
         if self.featurewise_center or self.featurewise_std_normalization:
             self.std -= np.power(self.mean, 2.0)

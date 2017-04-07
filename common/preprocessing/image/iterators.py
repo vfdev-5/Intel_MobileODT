@@ -104,14 +104,15 @@ class ImageDataIterator(Iterator):
         #
         # Override this method when inherits of ImageDataIterator
         #
-        pass
+        assert isinstance(y, np.ndarray) and len(y.shape) == 1, "Y should be an ndarray, one-hot encoded vector"
     
     def _create_y_batch(self, current_batch_size, x, y):
         # Method to create a batch of y targets
+        # Assume that y is one-hot encoded
         #
         # Override this method when inherits of ImageDataIterator
         #
-        return np.empty((current_batch_size,), dtype=object)
+        return np.zeros((current_batch_size, ) + y.shape, dtype=y.dtype)
         
     @staticmethod
     def _check_img_format(img, data_format):

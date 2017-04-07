@@ -2,7 +2,7 @@
 from keras import __version__
 assert __version__ == '1.2.2', "Wrong Keras version : %s" % __version__
 
-from keras.layers import Dense, Flatten, Input, Convolution2D, Activation, MaxPooling2D, UpSampling2D, merge
+from keras.layers import Input, Convolution2D, Activation, MaxPooling2D, UpSampling2D, merge
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
