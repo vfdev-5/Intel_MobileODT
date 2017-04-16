@@ -7,7 +7,7 @@ from image_utils import get_image_data
 from data_utils import type_to_index
 
 
-def image_provider(image_id_type_list, image_size=(224, 224), verbose=0):
+def image_provider(image_id_type_list, image_size=(224, 224), verbose=0, channels_first=True):
     for i, (image_id, image_type) in enumerate(image_id_type_list):
         if verbose > 0:
             print("Image id/type:", image_id, image_type, "| counter=", i)
@@ -18,7 +18,8 @@ def image_provider(image_id_type_list, image_size=(224, 224), verbose=0):
                 print("Image is corrupted. Id/Type:", image_id, image_type)
             continue
         img = cv2.resize(img, dsize=image_size[::-1])
-        img = img.transpose([2, 0, 1])
+        if channels_first:
+            img = img.transpose([2, 0, 1])
         img = img.astype(np.float32) / 255.0
 
         yield img, img, (image_id, image_type)
@@ -27,6 +28,7 @@ def image_provider(image_id_type_list, image_size=(224, 224), verbose=0):
 def image_mask_provider(image_id_type_list,
                         label_type,
                         image_size=(224, 224),
+                        channels_first=True,
                         test_mode=False,
                         save_to_dir=None,
                         verbose=0):
@@ -49,12 +51,14 @@ def image_mask_provider(image_id_type_list,
                         print("Image is corrupted. Id/Type:", image_id, image_type)
                     continue
                 img = cv2.resize(img, dsize=image_size[::-1])
-                img = img.transpose([2, 0, 1])
+                if channels_first:
+                    img = img.transpose([2, 0, 1])
                 img = img.astype(np.float32) / 255.0
 
                 label = get_image_data(image_id + "_" + image_type, label_type)
                 label = cv2.resize(label, dsize=image_size[::-1])
-                label = label.transpose([2, 0, 1])
+                if channels_first:
+                    label = label.transpose([2, 0, 1])
 
                 if save_to_dir is not None:
                     if not os.path.exists(save_to_dir):
@@ -103,6 +107,7 @@ class DataCache(object):
 def cached_image_mask_provider(image_id_type_list,
                                mask_type,
                                image_size=(224, 224),
+                               channels_first=True,
                                test_mode=False,
                                cache=None,
                                verbose=0):
@@ -138,11 +143,13 @@ def cached_image_mask_provider(image_id_type_list,
                         print("Image is corrupted. Id/Type:", image_id, image_type)
                     continue
                 img = cv2.resize(img, dsize=image_size[::-1])
-                img = img.transpose([2, 0, 1])
+                if channels_first:
+                    img = img.transpose([2, 0, 1])
                 img = img.astype(np.float32) / 255.0
                 mask = get_image_data(image_id + "_" + image_type, mask_type)
                 mask = cv2.resize(mask, dsize=image_size[::-1])
-                mask = mask.transpose([2, 0, 1])
+                if channels_first:
+                    mask = mask.transpose([2, 0, 1])
 
                 # fill the cache only at first time:
                 if counter == 0:
@@ -157,7 +164,11 @@ def cached_image_mask_provider(image_id_type_list,
         counter += 1
 
 
-def cached_image_provider(image_id_type_list, image_size=(224, 224), cache=None, verbose=0):
+def cached_image_provider(image_id_type_list,
+                          image_size=(224, 224),
+                          channels_first=True,
+                          cache=None,
+                          verbose=0):
     if cache is None:
         cache = DataCache(n_samples=500)
 
@@ -175,7 +186,8 @@ def cached_image_provider(image_id_type_list, image_size=(224, 224), cache=None,
                     print("Image is corrupted. Id/Type:", image_id, image_type)
                 continue
             img = cv2.resize(img, dsize=image_size[::-1])
-            img = img.transpose([2, 0, 1])
+            if channels_first:
+                img = img.transpose([2, 0, 1])
             img = img.astype(np.float32) / 255.0
             if i == 0:
                 cache.put(key, (img, None))
@@ -184,6 +196,8 @@ def cached_image_provider(image_id_type_list, image_size=(224, 224), cache=None,
 
 
 def cached_image_label_provider(image_id_type_list,
+                                image_size,
+                                channels_first=True,
                                 test_mode=False,
                                 cache=None,
                                 verbose=0):
@@ -217,9 +231,10 @@ def cached_image_label_provider(image_id_type_list,
                     if verbose > 0:
                         print("Image is corrupted. Id/Type:", image_id, image_type)
                     continue
-                if img.shape[:2] != (224, 224):
-                    img = cv2.resize(img, dsize=(224, 224))
-                img = img.transpose([2, 0, 1])
+                if img.shape[:2] != image_size:
+                    img = cv2.resize(img, dsize=image_size)
+                if channels_first:
+                    img = img.transpose([2, 0, 1])
                 img = img.astype(np.float32) / 255.0
                 label = np.array([0, 0, 0], dtype=np.uint8)
                 label[type_to_index[image_type[:6]]] = 1

@@ -21,7 +21,7 @@ class ImageDataGenerator(KerasImageDataGenerator):
     # Arguments
         pipeline: list of functions or str to specify transformations to apply on image.
         Each function should take as input a 3D ndarray and return transformed x.
-        Recognized `str` transformations : 'standardize', 'random_transform'.        
+        Recognized `str` transformations : 'standardize', 'random_transform'.
 
         Other parameters are inherited from keras.preprocessing.image.ImageDataGenerator
 
@@ -40,12 +40,12 @@ class ImageDataGenerator(KerasImageDataGenerator):
                 # ...
                 yield image, target
             if not infinite:
-                return 
-    
+                return
+
     train_gen = ImageDataGenerator(pipeline=('random_transform', 'standardize'),
                              featurewise_center=True,
                              featurewise_std_normalization=True,
-                             rotation_range=90., 
+                             rotation_range=90.,
                              width_shift_range=0.15, height_shift_range=0.15,
                              shear_range=3.14/6.0,
                              zoom_range=0.25,
@@ -54,8 +54,8 @@ class ImageDataGenerator(KerasImageDataGenerator):
                              vertical_flip=True)
     
     train_gen.fit(xy_provider(train_image_ids, infinite=False),
-            len(train_image_ids), 
-            augment=True, 
+            len(train_image_ids),
+            augment=True,
             save_to_dir=GENERATED_DATA,
             batch_size=4,
             verbose=1)
@@ -309,15 +309,10 @@ class ImageDataGenerator(KerasImageDataGenerator):
                 p = list(self._pipeline)
                 p.remove(self.standardize)
                 self._pipeline = tuple(p)
-            xy_iterator = ImageDataIterator(xy_provider, n_samples, self,
-                                            batch_size=batch_size,
-                                            seed=seed,
-                                            data_format=self.data_format)
+            xy_iterator = self.flow(xy_provider, n_samples, batch_size=batch_size, seed=seed)
         else:
-            xy_iterator = ImageDataIterator(xy_provider, n_samples, None,
-                                            batch_size=batch_size,
-                                            seed=seed,
-                                            data_format=self.data_format)
+            xy_iterator = self.flow(xy_provider, n_samples, batch_size=batch_size, seed=seed)
+            xy_iterator.image_data_generator = None
 
         if verbose == 1:
             progbar = Progbar(target=n_samples)
@@ -346,6 +341,9 @@ class ImageDataGenerator(KerasImageDataGenerator):
             if self.zca_whitening:
                 _total_x[counter*batch_size:(counter+1)*batch_size, :, :, :] = x
             counter += 1
+            if counter > n_samples:
+                print("Warning. Data provider `xy_iterator` yields more samples than `n_samples`")
+                break
 
         if verbose == 1:
             progbar.update(n_samples)
@@ -355,8 +353,8 @@ class ImageDataGenerator(KerasImageDataGenerator):
             self.std = np.sqrt(self.std)
             broadcast_shape = [1, 1, 1]
             broadcast_shape[self.channel_axis - 1] = x.shape[self.channel_axis]
-            self.mean = np.reshape(self.mean, broadcast_shape)
-            self.std = np.reshape(self.std, broadcast_shape)
+            self.mean = np.reshape(self.mean, broadcast_shape) if self.featurewise_center else None
+            self.std = np.reshape(self.std, broadcast_shape) if self.featurewise_std_normalization else None
 
             if self.zca_whitening:
                 _total_x -= self.mean
@@ -369,6 +367,7 @@ class ImageDataGenerator(KerasImageDataGenerator):
             u, s, _ = linalg.svd(sigma)
             self.principal_components = np.dot(np.dot(u, np.diag(1. / np.sqrt(s + K.epsilon()))), u.T)
 
+
         if augment:
             # Restore pipeline to the initial
             self._pipeline = pipeline
@@ -380,7 +379,7 @@ class ImageDataGenerator(KerasImageDataGenerator):
     def flow(self, inf_xy_provider, n_samples, **kwargs):
         """
         Iterate over x, y provided by `xy_provider`
-        
+
         # Arguments:
             inf_xy_provider: infinite generator function that yields two 3D ndarrays image and mask of the same size.
             n_samples: number of different samples provided by infinite generator `xy_provider`.
@@ -438,7 +437,12 @@ class ImageMaskGenerator(ImageDataGenerator):
             batch_size=4,
             verbose=1)
 
-    val_gen = ImageMaskGenerator() # Just an infinite image/mask generator
+    val_gen = ImageDataGenerator(featurewise_center=True,
+                                 featurewise_std_normalization=True) # Just an infinite image/mask generator
+
+    val_gen.mean = train_gen.mean
+    val_gen.std = train_gen.std
+    val_gen.principal_components = train_gen.principal_components
 
     history = model.fit_generator(
         train_gen.flow(xy_provider(train_image_ids), # Infinite generator is used
@@ -489,7 +493,7 @@ class ImageMaskGenerator(ImageDataGenerator):
     def flow(self, inf_xy_provider, n_samples, **kwargs):
         """
         Iterate over x, y provided by `xy_provider`
-        
+
         # Arguments:
             inf_xy_provider: infinite generator function that yields two 3D ndarrays image and mask of the same size.
             n_samples: number of different samples provided by infinite generator `xy_provider`.

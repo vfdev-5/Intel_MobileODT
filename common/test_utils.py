@@ -2,16 +2,17 @@ import os
 import datetime
 
 import numpy as np
-import cv2
 import pandas as pd
+from keras import backend as K
 
 # Project
 from data_utils import test_ids, type_to_index, type_1_ids, type_2_ids, type_3_ids
+from data_utils import GENERATED_DATA
 from image_utils import imwrite, get_image_data
 from xy_providers import cached_image_provider as xy_provider
 
 # Local keras-contrib:
-from preprocessing.image.iterators import ImageMaskIterator, ImageDataIterator
+from preprocessing.image.generators import ImageMaskGenerator, ImageDataGenerator
 
 
 def get_test_id_type_list():
@@ -41,20 +42,35 @@ def get_test_id_type_list2(annotations):
 
 def segmentation_predict(model,
                          test_id_type_list,
+                         save_prefix,
                          batch_size=16,
                          xy_provider_cache=None,
                          image_size=(224, 224)):
 
-    test_iter = ImageMaskIterator(xy_provider(test_id_type_list,
-                                              image_size=image_size,
-                                              cache=xy_provider_cache),
-                                  len(test_id_type_list),
-                                  None,  # image generator
-                                  batch_size=batch_size,
-                                  data_format='channels_first')
+    test_gen = ImageMaskGenerator(featurewise_center=True,
+                                  featurewise_std_normalization=True,
+                                  rotation_range=90.,
+                                  horizontal_flip=True,
+                                  vertical_flip=True)
+
+    assert len(save_prefix) > 0, "WTF"
+    # Load mean, std, principal_components if file exists
+    filename = os.path.join(GENERATED_DATA, save_prefix + "_stats.npz")
+    assert os.path.exists(filename), "WTF"
+    print("Load existing file: %s" % filename)
+    npzfile = np.load(filename)
+    test_gen.mean = npzfile['mean']
+    test_gen.std = npzfile['std']
+
+    flow = test_gen.flow(xy_provider(test_id_type_list,
+                                     image_size=image_size,
+                                     cache=xy_provider_cache),
+                         # Ensure that all batches have the same size
+                         len(test_id_type_list),
+                         batch_size=batch_size)
 
     total_counter = 0
-    for x, _, info in test_iter:
+    for x, _, info in flow:
         y_pred = model.predict(x)
         s = y_pred.shape[0]
         for i in range(s):
@@ -68,22 +84,45 @@ def segmentation_predict(model,
 def classification_predict(model,
                            test_id_type_list,
                            batch_size=16,
+                           save_prefix="",
                            info='',
-                           xy_provider_cache=None,
-                           image_size=(224, 224)):
+                           xy_provider_cache=None):
 
-    test_iter = ImageDataIterator(xy_provider(test_id_type_list,
-                                              image_size=image_size,
-                                              cache=xy_provider_cache),
-                                  len(test_id_type_list),
-                                  None,  # image generator
-                                  batch_size=batch_size,
-                                  data_format='channels_first')
+    normalize_data = True
+    image_size = (299, 299)
+
+    if hasattr(K, 'image_data_format'):
+        channels_first = K.image_data_format() == 'channels_first'
+    elif hasattr(K, 'image_dim_ordering'):
+        channels_first = K.image_dim_ordering() == 'th'
+    else:
+        raise Exception("Failed to find backend data format")
+
+    test_gen = ImageDataGenerator(featurewise_center=normalize_data,
+                                  featurewise_std_normalization=normalize_data)
+
+    if normalize_data:
+        assert len(save_prefix) > 0, "WTF"
+        # Load mean, std, principal_components if file exists
+        filename = os.path.join(GENERATED_DATA, save_prefix + "_stats.npz")
+        assert os.path.exists(filename), "WTF"
+        print("Load existing file: %s" % filename)
+        npzfile = np.load(filename)
+        test_gen.mean = npzfile['mean']
+        test_gen.std = npzfile['std']
+
+    flow = test_gen.flow(xy_provider(test_id_type_list,
+                                     image_size=image_size,
+                                     channels_first=channels_first,
+                                     cache=xy_provider_cache),
+                         # Ensure that all batches have the same size
+                         len(test_id_type_list),
+                         batch_size=batch_size)
 
     df = pd.DataFrame(columns=['image_name', 'Type_1', 'Type_2', 'Type_3'])
     total_counter = 0
     ll = len(test_id_type_list)
-    for x, _, image_ids in test_iter:
+    for x, _, image_ids in flow:
         y_pred = model.predict(x)
         s = x.shape[0]
         print("--", total_counter, '/', ll)

@@ -9,17 +9,18 @@ from keras import backend as K
 
 class ImageDataIterator(Iterator):
     """
-    Generate minibatches of image and targets data. Similar to keras `NumpyArrayIterator`, `DirectoryIterator`, but data is 
-    provided by a user-written generator function. This iterator is used to flow data in batches and optionally transform with
-    a `image_data_generator`.
-    
-        
+    Generate minibatches of image and targets data. Similar to keras `NumpyArrayIterator`, `DirectoryIterator`, but data
+    is provided by a user-written generator function. This iterator is used to flow data in batches and optionally
+    transform with a `image_data_generator`.
+
     # Arguments
-        xy_provider: infinite or finite generator function that provides image and target data with `yield`, e.g. `yield X, Y`. 
+        xy_provider: infinite or finite generator function that provides image and target data with `yield`, e.g.
+        `yield X, Y`.
         Optionally, `xy_provider` can yield (x, y, additional_info), for example if some data identification is needed.
-        Provided X should be 3D ndarrays of shape corresponding to `data_format`. There are no restrictions on Y type. 
+        Provided X should be 3D ndarrays of shape corresponding to `data_format`. There are no restrictions on Y type.
         See example below.
-        n: total number of different samples (images and targets) provided by `xy_provider`, even if generator is infinite.
+        n: total number of different samples (images and targets) provided by `xy_provider`, even if generator is
+        infinite.
         image_data_generator: instance of ImageDataGenerator.
         Other parameters are inherited from keras.preprocessing.image.Iterator and NumpyArrayIterator
     
@@ -32,13 +33,15 @@ class ImageDataIterator(Iterator):
 
             # Some custom preprocesssing: resize
             # ...
+            image = image.astype(np.float32)
+            image *= 1.0/255.0
 
             yield image, target
             # Or optionally:
             # yield image, target, image_id
     ```
-    
-    Example, an infinite xy_provider 
+
+    Example, an infinite xy_provider
     ```
     def inf_xy_provider(image_ids):
         while 1:
@@ -48,6 +51,8 @@ class ImageDataIterator(Iterator):
 
                 # Some custom preprocesssing: resize
                 # ...
+                image = image.astype(np.float32)
+                image *= 1.0/255.0
 
                 yield image, target
                 # Or optionally:
@@ -81,15 +86,24 @@ class ImageDataIterator(Iterator):
 
         self.data_format = data_format
         self.xy_provider = xy_provider
+        self._process = None
+        self._image_data_generator = None
         self.image_data_generator = image_data_generator
 
-        if image_data_generator is None:
+    @property
+    def image_data_generator(self):
+        return self._image_data_generator
+
+    @image_data_generator.setter
+    def image_data_generator(self, generator):
+        self._image_data_generator = generator
+        if self._image_data_generator is None:
             self._process = self._empty_process
-        elif hasattr(image_data_generator, 'process'):
+        elif hasattr(self._image_data_generator, 'process'):
             self._process = self.image_data_generator.process
         else:
             self._process = self._default_image_data_generator_process
-            
+
     def _empty_process(self, img, target):
         return img, target
             
@@ -183,6 +197,8 @@ class ImageMaskIterator(ImageDataIterator):
 
             # Some custom preprocesssing: resize
             # ...
+            image = image.astype(np.float32)
+            image *= 1.0/255.0
 
             yield image, mask
             # Or optionally:
@@ -199,6 +215,8 @@ class ImageMaskIterator(ImageDataIterator):
 
                 # Some custom preprocesssing: resize
                 # ...
+                image = image.astype(np.float32)
+                image *= 1.0/255.0
 
                 yield image, mask
                 # Or optionally:

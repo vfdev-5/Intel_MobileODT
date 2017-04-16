@@ -68,14 +68,9 @@ def get_filename(image_id, image_type):
         data_path = os.path.join(GENERATED_DATA, 'trainval_labels_0')
         ext = 'npz'
         check_dir = True
-    elif image_type == 'os_cervix_label_1':
-        # Results of U-net predictions of os/cervix segmentation, seed 2017
-        data_path = os.path.join(GENERATED_DATA, 'os_cervix_labels_1')
-        ext = 'npz'
-        check_dir = True
-    elif image_type == 'os_cervix_label_2':
-        # Results of U-net predictions of os/cervix segmentation, seed 54321
-        data_path = os.path.join(GENERATED_DATA, 'os_cervix_labels_2')
+    elif 'os_cervix_label_seed=' in image_type:
+        # Results of U-net predictions of os/cervix segmentation, with a seed
+        data_path = os.path.join(GENERATED_DATA, image_type)
         ext = 'npz'
         check_dir = True
     elif image_type == 'os_cervix_label':
