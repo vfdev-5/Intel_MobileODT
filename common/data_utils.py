@@ -37,6 +37,40 @@ additional_type_2_ids = [s[len(os.path.join(ADDITIONAL_DATA, "Type_2"))+1:-4] fo
 additional_type_3_files = glob(os.path.join(ADDITIONAL_DATA, "Type_3", "*.jpg"))
 additional_type_3_ids = [s[len(os.path.join(ADDITIONAL_DATA, "Type_3"))+1:-4] for s in additional_type_3_files]
 
+
+# Remove bad images:
+type_1_ids.remove('1339')  # corrupted image
+ids_to_remove = [
+    # Corrupted
+    '3068',
+    # Size = 0
+    '5893',
+    # No cervix
+    '4706',     '2030',    '4065',    '4702',    '6360',    '746',
+    # Blurry
+    '4874',     '4701',    '4041',    '4687',    '4684',    '2835',    '2150',
+]
+for i in ids_to_remove:
+    additional_type_1_ids.remove(i)
+
+
+ids_to_remove = [
+    # No cervix
+    '5691', '5684', '5792', '5683', '5714', '5688', '5690', '5954', '6342', '3507', '5677',
+    '5685', '327',
+    # Blurry
+    '1618', '2036', '2095', '2255', '2828', '5696', '5897', '1767', '4763', '4764', '4936',
+    '5605', '5610', '5702', '5755', '1063', '2637', '6885', '4550', '4611', '5330', '5433',
+    '5437', '5426', '4224', '5651', '5689', '5705', '5967', '6347'
+]
+for i in ids_to_remove:
+    try:
+        additional_type_3_ids.remove(i)
+    except ValueError as e:
+        print(e, i)
+
+
+# Test data
 test_files = glob(os.path.join(TEST_DATA, "*.jpg"))
 test_ids = [s[len(TEST_DATA)+1:-4] for s in test_files]
 
@@ -44,6 +78,9 @@ type_to_index = {
     "Type_1": 0,
     "Type_2": 1,
     "Type_3": 2,
+    "AType_1": 0,
+    "AType_2": 1,
+    "AType_3": 2,
 }
 
 
@@ -68,14 +105,14 @@ def get_filename(image_id, image_type):
         data_path = os.path.join(GENERATED_DATA, 'trainval_labels_0')
         ext = 'npz'
         check_dir = True
-    elif 'os_cervix_label_seed=' in image_type:
+    elif 'os_cervix_label_' in image_type:
         # Results of U-net predictions of os/cervix segmentation, with a seed
         data_path = os.path.join(GENERATED_DATA, image_type)
         ext = 'npz'
         check_dir = True
-    elif image_type == 'os_cervix_label':
-        # Results of ensembling of U-net predictions of os/cervix segmentation
-        data_path = os.path.join(GENERATED_DATA, 'os_cervix_labels_final')
+    elif image_type == 'os_cervix_bbox':
+        # Results of ensembling of U-net predictions of os/cervix segmentation as bbox
+        data_path = os.path.join(GENERATED_DATA, 'os_cervix_bbox')
         ext = 'npz'     
         check_dir = True
     elif image_type == 'Type_1_os' or \

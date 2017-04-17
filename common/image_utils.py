@@ -17,10 +17,16 @@ def get_image_data(image_id, image_type, return_shape_only=False):
     return _get_image_data_pil(image_id, image_type, return_shape_only=return_shape_only)
 
 
+def get_image_bbox(image_id, image_type):
+    filename = get_filename(image_id, image_type)
+    npzfile = np.load(filename)
+    return npzfile['os_bbox'], npzfile['cervix_bbox'], tuple(npzfile['image_size'])
+
+
 def imwrite(img, image_id, image_type):
     output_filename = get_filename(image_id, image_type)
     if 'label' in image_type and 'gray' not in image_type:
-        np.savez(output_filename, img)
+        np.savez_compressed(output_filename, img)
     else:
         pil_image = Image.fromarray(img)
         pil_image.save(output_filename)

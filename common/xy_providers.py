@@ -3,7 +3,7 @@ import os
 import numpy as np
 import cv2
 
-from image_utils import get_image_data
+from image_utils import get_image_data, get_image_bbox
 from data_utils import type_to_index
 
 
@@ -176,7 +176,7 @@ def cached_image_provider(image_id_type_list,
         if verbose > 0:
             print("Image id/type:", image_id, image_type, "| counter=", i)
 
-        key = image_id + '_' + image_type
+        key = (image_id, image_type)
         if key in cache:
             img, _ = cache.get(key)
         else:
@@ -189,14 +189,50 @@ def cached_image_provider(image_id_type_list,
             if channels_first:
                 img = img.transpose([2, 0, 1])
             img = img.astype(np.float32) / 255.0
-            if i == 0:
-                cache.put(key, (img, None))
+            cache.put(key, (img, None))
 
         yield img, None, (image_id, image_type)
 
 
+def get_os_image(image_id, image_type, cache=None):
+    os_bbox, cervix_bbox, image_size = get_image_bbox(image_id + "_" + image_type, 'os_cervix_bbox')
+    if cache is not None:
+        key = (image_id, image_type)
+        if key in cache:
+            img = cache.get(key)
+        else:
+            img = get_image_data(image_id, image_type)
+            cache.put(key, img)
+    else:
+        img = get_image_data(image_id, image_type)
+    if img.shape[:2] != image_size:
+        img = cv2.resize(img, dsize=image_size)
+    os_img = img[os_bbox[1]:os_bbox[3], os_bbox[0]:os_bbox[2], :]
+    os_img = cv2.resize(os_img, dsize=image_size)
+    return os_img
+
+
+def get_cervix_image(image_id, image_type, cache=None):
+    os_bbox, cervix_bbox, image_size = get_image_bbox(image_id + "_" + image_type, 'os_cervix_bbox')
+    if cache is not None:
+        key = (image_id, image_type)
+        if key in cache:
+            img = cache.get(key)
+        else:
+            img = get_image_data(image_id, image_type)
+            cache.put(key, img)
+    else:
+        img = get_image_data(image_id, image_type)
+    if img.shape[:2] != image_size:
+        img = cv2.resize(img, dsize=image_size)
+    cervix_img = img[cervix_bbox[1]:cervix_bbox[3], cervix_bbox[0]:cervix_bbox[2], :]
+    cervix_img = cv2.resize(cervix_img, dsize=image_size)
+    return cervix_img
+
+
 def cached_image_label_provider(image_id_type_list,
                                 image_size,
+                                option=None,  # 'cervix' or 'os'
                                 channels_first=True,
                                 test_mode=False,
                                 cache=None,
@@ -218,7 +254,7 @@ def cached_image_label_provider(image_id_type_list,
             if verbose > 0:
                 print("Image id/type:", image_id, image_type, "| counter=", i)
 
-            key = image_id + '_' + image_type
+            key = (image_id, image_type)
             if key in cache:
                 if verbose > 0:
                     print("-- Load from RAM")
@@ -226,18 +262,22 @@ def cached_image_label_provider(image_id_type_list,
             else:
                 if verbose > 0:
                     print("-- Load from disk")
-                img = get_image_data(image_id, image_type)
-                if img.dtype.kind is not 'u':
-                    if verbose > 0:
-                        print("Image is corrupted. Id/Type:", image_id, image_type)
-                    continue
+
+                if option == 'cervix':
+                    img = get_cervix_image(image_id, image_type)
+                elif option == 'os':
+                    img = get_os_image(image_id, image_type)
+                else:
+                    img = get_image_data(image_id, image_type)
+
                 if img.shape[:2] != image_size:
                     img = cv2.resize(img, dsize=image_size)
+
                 if channels_first:
                     img = img.transpose([2, 0, 1])
                 img = img.astype(np.float32) / 255.0
                 label = np.array([0, 0, 0], dtype=np.uint8)
-                label[type_to_index[image_type[:6]]] = 1
+                label[type_to_index[image_type]] = 1
                 # fill the cache only at first time:
                 if counter == 0:
                     cache.put(key, (img, label))

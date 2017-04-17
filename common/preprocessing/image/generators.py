@@ -479,7 +479,10 @@ class ImageMaskGenerator(ImageDataGenerator):
             A transformed version of the inputs (same shape).
         """
         xt = x.copy().astype(K.floatx())
-        yt = y.copy().astype(K.floatx())
+        if y is not None:
+            yt = y.copy().astype(K.floatx())
+        else:
+            yt = y
         for t in self._pipeline:
             xt, yt = t(xt, yt)
         return xt, yt

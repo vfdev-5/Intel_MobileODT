@@ -12,6 +12,7 @@ from keras import __version__ as keras_version
 
 # Project
 from data_utils import test_ids, type_to_index, type_1_ids, type_2_ids, type_3_ids
+from data_utils import additional_type_1_ids, additional_type_2_ids, additional_type_3_ids
 from data_utils import GENERATED_DATA
 from image_utils import get_image_data, imwrite
 from metrics import jaccard_index, logloss_mc
@@ -28,13 +29,18 @@ def find_best_weights_file(weights_files):
     best_weights_filename = ""
     for f in weights_files:
         index = os.path.basename(f).index('-')
-        loss = float(os.path.basename(f)[index+1:-3])
+        end_index = -3
+        loss_str = os.path.basename(f)[index+1:end_index]
+        if '-' in loss_str:
+            end_index = loss_str.index('-')
+            loss_str = loss_str[:end_index]
+        loss = float(loss_str)
         if best_val_loss > loss:
             best_val_loss = loss
             best_weights_filename = f
     return best_weights_filename, best_val_loss
-    
-    
+
+
 def get_trainval_id_type_lists(val_split=0.3, type_ids=(type_1_ids, type_2_ids, type_3_ids)):
     image_types = ["Type_1", "Type_2", "Type_3"]
     train_ll = [int(len(ids) * (1.0 - val_split)) for ids in type_ids]
@@ -66,6 +72,47 @@ def get_trainval_id_type_lists(val_split=0.3, type_ids=(type_1_ids, type_2_ids, 
     print("-", train_ll, " images of corresponding types")
     print("Validation dataset contains : ")
     print("-", val_ll, " images of corresponding types")
+
+    return train_id_type_list, val_id_type_list
+
+
+def get_trainval_id_type_lists3(n_images_per_class=730, val_split=0.3, seed=2017):
+
+    np.random.seed(seed)
+
+    def _get_id_type_list(n_images, type_ids, image_types):
+        id_type_list = []
+        for ids, image_type in zip(type_ids, image_types):
+            for image_id in ids:
+                id_type_list.append((image_id, image_type))
+
+        np.random.shuffle(id_type_list)
+        assert len(id_type_list) > n_images, "WTF"
+        return id_type_list[:n_images]
+
+    id_type_1_list = _get_id_type_list(n_images_per_class,
+                                       [type_1_ids, additional_type_1_ids],
+                                       ["Type_1", "AType_1"])
+
+    id_type_2_list = _get_id_type_list(n_images_per_class,
+                                       [type_2_ids, additional_type_2_ids],
+                                       ["Type_2", "AType_2"])
+
+    id_type_3_list = _get_id_type_list(n_images_per_class,
+                                       [type_3_ids, additional_type_3_ids],
+                                       ["Type_3", "AType_3"])
+
+    train_ll = int(n_images_per_class * (1.0 - val_split))
+    train_id_type_list = list(id_type_1_list[:train_ll])
+    train_id_type_list.extend(id_type_2_list[:train_ll])
+    train_id_type_list.extend(id_type_3_list[:train_ll])
+
+    val_id_type_list = list(id_type_1_list[train_ll:])
+    val_id_type_list.extend(id_type_2_list[train_ll:])
+    val_id_type_list.extend(id_type_3_list[train_ll:])
+
+    np.random.shuffle(train_id_type_list)
+    np.random.shuffle(val_id_type_list)
 
     return train_id_type_list, val_id_type_list
 
@@ -336,6 +383,7 @@ def segmentation_validate(model,
 def classification_train(model,
                          train_id_type_list,
                          val_id_type_list,
+                         option=None,
                          batch_size=16,
                          nb_epochs=10,
                          lrate_decay_f=None,
@@ -370,7 +418,7 @@ def classification_train(model,
     train_gen = ImageDataGenerator(pipeline=('random_transform', random_rgb_to_green_generic, 'standardize'),
                                    featurewise_center=normalize_data,
                                    featurewise_std_normalization=normalize_data,
-                                   rotation_range=45.,
+                                   rotation_range=15.,
                                    # width_shift_range=0.15, height_shift_range=0.15,
                                    # shear_range=3.14/6.0,
                                    # zoom_range=0.25,
@@ -378,7 +426,7 @@ def classification_train(model,
                                    horizontal_flip=True,
                                    vertical_flip=True,
                                    fill_mode='constant')
-    val_gen = ImageDataGenerator(rotation_range=90.,
+    val_gen = ImageDataGenerator(rotation_range=15.,
                                  featurewise_center=normalize_data,
                                  featurewise_std_normalization=normalize_data,
                                  horizontal_flip=True,
@@ -397,6 +445,7 @@ def classification_train(model,
             print("\n-- Fit stats of train dataset")
             train_gen.fit(xy_provider(train_id_type_list,
                                       image_size=image_size,
+                                      option=option,
                                       test_mode=True,
                                       channels_first=channels_first,
                                       cache=xy_provider_cache),
@@ -421,6 +470,7 @@ def classification_train(model,
 
         train_flow = train_gen.flow(xy_provider(train_id_type_list,
                                                 image_size=image_size,
+                                                option=option,
                                                 channels_first=channels_first,
                                                 cache=xy_provider_cache,
                                                 verbose=xy_provider_verbose),
@@ -431,6 +481,7 @@ def classification_train(model,
 
         val_flow = val_gen.flow(xy_provider(val_id_type_list,
                                             image_size=image_size,
+                                            option=option,
                                             channels_first=channels_first,
                                             cache=xy_provider_cache,
                                             verbose=xy_provider_verbose),
@@ -457,11 +508,11 @@ def classification_train(model,
                                           nb_val_samples=nb_val_samples,
                                           callbacks=callbacks,
                                           verbose=verbose)
-            # save the last
-            val_loss = history.history['val_loss'][-1]
-            weights_filename = weights_filename.format(epoch=nb_epochs, val_loss=val_loss)
-            model.save_weights(weights_filename)
-            return history
+        # save the last
+        val_loss = history.history['val_loss'][-1]
+        weights_filename = weights_filename.format(epoch=nb_epochs, val_loss=val_loss)
+        model.save_weights(weights_filename)
+        return history
 
     except KeyboardInterrupt:
         pass
@@ -469,6 +520,7 @@ def classification_train(model,
 
 def classification_validate(model,
                             val_id_type_list,
+                            option=None,
                             save_prefix="",
                             batch_size=16,
                             xy_provider_cache=None):
@@ -500,6 +552,7 @@ def classification_validate(model,
 
     flow = val_gen.flow(xy_provider(val_id_type_list,
                                     image_size=image_size,
+                                    option=option,
                                     channels_first=channels_first,
                                     cache=xy_provider_cache,
                                     test_mode=True),
