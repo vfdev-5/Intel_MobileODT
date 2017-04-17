@@ -50,8 +50,11 @@ ids_to_remove = [
     # Blurry
     '4874',     '4701',    '4041',    '4687',    '4684',    '2835',    '2150',
 ]
-for i in ids_to_remove:
-    additional_type_1_ids.remove(i)
+try:
+    for i in ids_to_remove:
+        additional_type_1_ids.remove(i)
+except ValueError as e:
+    print(e, i)
 
 
 ids_to_remove = [
@@ -63,11 +66,11 @@ ids_to_remove = [
     '5605', '5610', '5702', '5755', '1063', '2637', '6885', '4550', '4611', '5330', '5433',
     '5437', '5426', '4224', '5651', '5689', '5705', '5967', '6347'
 ]
-for i in ids_to_remove:
-    try:
+try:
+    for i in ids_to_remove:    
         additional_type_3_ids.remove(i)
-    except ValueError as e:
-        print(e, i)
+except ValueError as e:
+    print(e, i)
 
 
 # Test data

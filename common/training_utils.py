@@ -86,7 +86,7 @@ def get_trainval_id_type_lists3(n_images_per_class=730, val_split=0.3, seed=2017
             for image_id in ids:
                 id_type_list.append((image_id, image_type))
 
-        np.random.shuffle(id_type_list)
+        #np.random.shuffle(id_type_list)
         assert len(id_type_list) > n_images, "WTF"
         return id_type_list[:n_images]
 
