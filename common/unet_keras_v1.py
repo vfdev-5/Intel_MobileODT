@@ -5,7 +5,7 @@ assert __version__ == '1.2.2', "Wrong Keras version : %s" % __version__
 from keras.layers import Input, Convolution2D, Activation, MaxPooling2D, UpSampling2D, merge
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
-from keras.optimizers import Adam
+from keras.optimizers import Adam, Adadelta
 from keras.backend import set_image_dim_ordering
 
 from keras_metrics import jaccard_loss, jaccard_index
@@ -55,7 +55,7 @@ def decoder(list_encoder, list_nb_filters):
     return temp_layers[-1]
 
 
-def get_unet(input_shape, n_classes, n_filters=32):
+def get_unet(input_shape, n_classes, n_filters=32, optimizer='adam'):
 
     inputs = Input(input_shape)
 
@@ -66,6 +66,11 @@ def get_unet(input_shape, n_classes, n_filters=32):
     outputs = Activation("sigmoid")(x)
     
     model = Model(input=inputs, output=outputs)
-    opt = Adam(lr=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+    if optimizer == 'adam':
+        opt = Adam(lr=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+    elif optimizer == 'adadelta':
+        opt = Adadelta()
+    else:
+        raise Exception("Optimizer '%s' is unknown" % optimizer)
     model.compile(optimizer=opt, loss=jaccard_loss, metrics=[jaccard_index, 'recall', 'precision'])
     return model

@@ -132,6 +132,18 @@ def os_cervix_postproc_batch(y_pred):
     return y_pred
 
 
+def get_bbox(mask):
+    img_proj_x = np.sum(mask, axis=0)
+    img_proj_y = np.sum(mask, axis=1)
+    indices = np.where(img_proj_x > 0)
+    xmin = indices[0][0]
+    xmax = indices[0][-1]
+    indices = np.where(img_proj_y > 0)
+    ymin = indices[0][0]
+    ymax = indices[0][-1]
+    return [xmin, ymin, xmax, ymax]
+
+
 def crop_to_mask(img, mask):
     img = cv2.bitwise_and(img, img, mask=mask)
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)

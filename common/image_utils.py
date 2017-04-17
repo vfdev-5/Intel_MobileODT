@@ -8,19 +8,25 @@ import numpy as np
 from data_utils import get_filename
 
 
-def get_image_data(image_id, image_type):
+def get_image_data(image_id, image_type, return_shape_only=False):
     """
     Method to get image data as np.array specifying image id and type
     """
     if 'label' in image_type and 'gray' not in image_type:
         return np.load(get_filename(image_id, image_type))['arr_0']
-    return _get_image_data_pil(image_id, image_type)
+    return _get_image_data_pil(image_id, image_type, return_shape_only=return_shape_only)
+
+
+def get_image_bbox(image_id, image_type):
+    filename = get_filename(image_id, image_type)
+    npzfile = np.load(filename)
+    return npzfile['os_bbox'], npzfile['cervix_bbox'], tuple(npzfile['image_size'])
 
 
 def imwrite(img, image_id, image_type):
     output_filename = get_filename(image_id, image_type)
     if 'label' in image_type and 'gray' not in image_type:
-        np.savez(output_filename, img)
+        np.savez_compressed(output_filename, img)
     else:
         pil_image = Image.fromarray(img)
         pil_image.save(output_filename)
@@ -37,7 +43,7 @@ def _get_image_data_opencv(image_id, image_type):
     return img
 
 
-def _get_image_data_pil(image_id, image_type, return_exif_md=False):
+def _get_image_data_pil(image_id, image_type, return_exif_md=False, return_shape_only=False):
     """
     Method to get image data as np.array specifying image id and type
     """
@@ -46,6 +52,9 @@ def _get_image_data_pil(image_id, image_type, return_exif_md=False):
         img_pil = Image.open(fname)
     except Exception as e:
         assert False, "Failed to read image : %s, %s. Error message: %s" % (image_id, image_type, e)
+
+    if return_shape_only:
+        return img_pil.size[::-1] + (len(img_pil.getbands()),)
 
     img = np.asarray(img_pil)
     assert isinstance(img, np.ndarray), "Open image is not an ndarray. Image id/type : %s, %s" % (image_id, image_type)
@@ -70,11 +79,11 @@ def generate_label_gray_images(annotations):
         image_name = annotation['filename']
         image_id = os.path.basename(image_name)[:-4]
         image_type = os.path.split(os.path.dirname(image_name))[1]
-        src_image = get_image_data(image_id, image_type)
+        src_shape = get_image_data(image_id, image_type)
         
         print('--', image_id, image_type, i, '/', n)
         ll = len(annotation['annotations'])
-        label_image = np.zeros(src_image.shape[:2], dtype=np.uint8)
+        label_image = np.zeros(src_shape[:2], dtype=np.uint8)
         for label in annotation['annotations']:
             
             assert label['type'] == u'rect', "Type '%s' is not supported" % label['type']
@@ -93,16 +102,27 @@ def generate_label_images(annotations):
     def _clamp(x, dim):
         return min(max(x, 0), dim - 1)
 
+    ll = max([len(a['annotations'])] for a in annotations)  # Number of annotation classes
+    ll = ll[0]
+
     for i, annotation in enumerate(annotations):
 
         image_name = annotation['filename']
         image_id = os.path.basename(image_name)[:-4]
-        image_type = os.path.split(os.path.dirname(image_name))[1]
-        src_image = get_image_data(image_id, image_type)
-        
+        splt = os.path.split(os.path.dirname(image_name))
+        if os.path.basename(splt[0]).lower() == "train":
+            image_type = splt[1]
+        elif os.path.basename(splt[0]).lower() == "additional":
+            image_type = "A" + splt[1]
+        else:
+            raise Exception("Unknown type : %s" % os.path.basename(splt[0]))
+
         print('--', image_id, image_type, i, '/', n)
-        ll = len(annotation['annotations'])
-        label_image = np.zeros(src_image.shape[:2] + (ll,), dtype=np.uint8)
+        if os.path.exists(get_filename(image_id + '_' + image_type, 'trainval_label_0')):
+            continue
+
+        src_shape = get_image_data(image_id, image_type, return_shape_only=True)
+        label_image = np.zeros(src_shape[:2] + (ll,), dtype=np.uint8)
         h, w, _ = label_image.shape
         for label in annotation['annotations']:
             assert label['type'] == u'rect', "Type '%s' is not supported" % label['type']
@@ -111,4 +131,104 @@ def generate_label_images(annotations):
             pt2 = (_clamp(pt1[0] + int(label['width']), w), _clamp(pt1[1] + int(label['height']), h))
             label_image[pt1[1]:pt2[1], pt1[0]:pt2[0], index] = 1
         
-        imwrite(label_image, image_id + '_' + image_type, 'trainval_label')    
+        imwrite(label_image, image_id + '_' + image_type, 'trainval_label_0')
+
+
+def normalize(in_img, q_min=0.5, q_max=99.5, return_mins_maxs=False):
+    """
+    Normalize image in [0.0, 1.0]
+    mins is array of minima
+    maxs is array of differences between maxima and minima
+    """
+    init_shape = in_img.shape
+    if len(init_shape) == 2:
+        in_img = np.expand_dims(in_img, axis=2)
+    w, h, d = in_img.shape
+    img = in_img.copy()
+    img = np.reshape(img, [w * h, d]).astype(np.float64)
+    mins = np.percentile(img, q_min, axis=0)
+    maxs = np.percentile(img, q_max, axis=0) - mins
+    maxs[(maxs < 0.0001) & (maxs > -0.0001)] = 0.0001
+    img = (img - mins[None, :]) / maxs[None, :]
+    img = img.clip(0.0, 1.0)
+    img = np.reshape(img, [w, h, d])
+    if init_shape != img.shape:
+        img = img.reshape(init_shape)
+    if return_mins_maxs:
+        return img, mins, maxs
+    return img
+
+
+def median_blur(img, ksize):
+    init_shape = img.shape
+    img2 = np.expand_dims(img, axis=2) if len(init_shape) == 2 else img
+    out = np.zeros_like(img2)
+    img_n, mins, maxs = normalize(img2, return_mins_maxs=True)
+    for i in range(img2.shape[2]):
+        img_temp = (255.0*img_n[:,:,i]).astype(np.uint8)
+        img_temp = 1.0/255.0 * cv2.medianBlur(img_temp, ksize).astype(img.dtype)
+        out[:,:,i] = maxs[i] * img_temp + mins[i]
+    out = out.reshape(init_shape)
+    return out
+
+
+def spot_cleaning(img, ksize, threshold=0.15):
+    """
+    ksize : kernel size for median blur
+    threshold for outliers, [0.0,1.0]
+    https://github.com/kmader/Quantitative-Big-Imaging-2016/blob/master/Lectures/02-Slides.pdf
+    """
+    init_type = img.dtype
+    init_shape = img.shape
+    if len(init_shape) == 2:
+        img = img[:, :, None]
+    img_median = median_blur(img, ksize).astype(np.float32)
+    diff = np.abs(img.astype(np.float32) - img_median)
+    diff = np.mean(diff, axis=2)
+    diff = normalize(diff, q_min=0, q_max=100)
+    diff2 = diff.copy()
+    _, diff = cv2.threshold(diff, threshold, 1.0, cv2.THRESH_BINARY)
+    _, diff2 = cv2.threshold(diff2, threshold, 1.0, cv2.THRESH_BINARY_INV)
+
+    img_median2 = img_median * diff[:, :, None]
+    img2 = img * diff2[:, :, None]
+    img2 += img_median2
+    if img2.shape != init_shape:
+        img2 = img2.reshape(init_shape)
+    return img2.astype(init_type)
+
+
+def normalize(in_img, q_min=0.5, q_max=99.5, return_mins_maxs=False):
+    """
+    Normalize image in [0.0, 1.0]
+    mins is array of minima
+    maxs is array of differences between maxima and minima
+    """
+    init_shape = in_img.shape
+    if len(init_shape) == 2:
+        in_img = np.expand_dims(in_img, axis=2)
+    w, h, d = in_img.shape
+    img = in_img.copy()
+    img = np.reshape(img, [w * h, d]).astype(np.float64)
+    mins = np.percentile(img, q_min, axis=0)
+    maxs = np.percentile(img, q_max, axis=0) - mins
+    maxs[(maxs < 0.0001) & (maxs > -0.0001)] = 0.0001
+    img = (img - mins[None, :]) / maxs[None, :]
+    img = img.clip(0.0, 1.0)
+    img = np.reshape(img, [w, h, d])
+    if init_shape != img.shape:
+        img = img.reshape(init_shape)
+    if return_mins_maxs:
+        return img, mins, maxs
+    return img
+
+
+def scale_percentile(matrix, q_min=0.5, q_max=99.5):
+    is_gray = False
+    if len(matrix.shape) == 2:
+        is_gray = True
+        matrix = matrix.reshape(matrix.shape + (1,))
+    matrix = (255*normalize(matrix, q_min, q_max)).astype(np.uint8)
+    if is_gray:
+        matrix = matrix.reshape(matrix.shape[:2])
+    return matrix  
