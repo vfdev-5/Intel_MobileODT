@@ -2,7 +2,7 @@ from keras.applications.xception import Xception
 from keras.layers import Dense, Dropout
 from keras.models import Model
 from keras.backend import set_image_data_format
-from keras.optimizers import Adadelta, Nadam
+from keras.optimizers import Adadelta, Nadam, Adam, RMSprop
 from keras import __version__
 
 assert __version__ == '2.0.2', "Wrong Keras version : %s" % __version__
@@ -10,7 +10,7 @@ assert __version__ == '2.0.2', "Wrong Keras version : %s" % __version__
 set_image_data_format('channels_last')
 
 
-def get_xception(trained=True, finetuning=True):
+def get_xception(trained=True, finetuning=True, optimizer='adadelta', lr=0.01):
     """
     Method get Xception model from keras applications, adapt inputs and outputs and return compiled model
     """
@@ -36,13 +36,25 @@ def get_xception(trained=True, finetuning=True):
                 layer.trainable = False
 
     x = base_model.output
-    x = Dropout(0.7)(x)
-    output = Dense(3, activation='softmax')(x)
+    x = Dropout(0.5)(x)
+    # output = Dense(3, activation='softmax')(x)
+    output = Dense(3, activation='sigmoid')(x)
     model = Model(inputs=base_model.input, outputs=output)
 
-    optimizer = Adadelta()
-    # optimizer = Nadam()
-    model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy', ])
+    
+    if optimizer == 'adadelta':
+        opt = Adadelta(lr=lr)
+    elif optimizer == 'adam':
+        opt = Adam(lr=lr)
+    elif optimizer == 'nadam':
+        opt = Nadam(lr=lr)
+    elif optimizer == 'rmsprop':
+        opt = RMSprop(lr=lr, decay=0.01)
+    else:
+        raise Exception("Optimizer '%s' is unknown" % optimizer)
+
+    # model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy', ])        
+    model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy', ])
     return model
 
 

@@ -37,7 +37,7 @@ additional_type_2_ids = [s[len(os.path.join(ADDITIONAL_DATA, "Type_2"))+1:-4] fo
 additional_type_3_files = glob(os.path.join(ADDITIONAL_DATA, "Type_3", "*.jpg"))
 additional_type_3_ids = [s[len(os.path.join(ADDITIONAL_DATA, "Type_3"))+1:-4] for s in additional_type_3_files]
 
-
+# ## TYPE 1
 # Remove bad images:
 type_1_ids.remove('1339')  # corrupted image
 ids_to_remove = [
@@ -46,31 +46,54 @@ ids_to_remove = [
     # Size = 0
     '5893',
     # No cervix
-    '4706',     '2030',    '4065',    '4702',    '6360',    '746',
+    '4706', '2030', '4065', '4702', '6360', '746',
+    '6180', '6181', '6182', '3997', '5983', '5985', '5948', 
     # Blurry
-    '4874',     '4701',    '4041',    '4687',    '4684',    '2835',    '2150',
+    '4874', '4701', '4041', '4687', '4684', '2835', '2150',
+    '4557', '6748', '4875', '3968', '3973', '3974', '3975', '5769', 
 ]
 try:
     for i in ids_to_remove:
         additional_type_1_ids.remove(i)
 except ValueError as e:
-    print(e, i)
+    print("Type_1", e, i)
+
+# ## TYPE 2
+# Remove bad images:
+ids_to_remove = [
+    # Size = 0
+    '2845', '5892',
+    # No cervix
+    '1813', '1879', '2310', '3002', '3542', '1720', '592', '3086', '2172', '1338',
+    '1982', '1988', '1744',
+    # Blurry
+    '1839', '6829', '2717', '2329', '3450', '3386', '908', '3103', '6294', '6295',
+    '6853', '6854', '6855', '6872', '6874', '6896', '879', '1230', 
+]
+try:
+    for i in ids_to_remove:
+        additional_type_2_ids.remove(i)
+except ValueError as e:
+    print("Type_2", e, i)
 
 
+# ## TYPE 3
+# Remove bad images:
 ids_to_remove = [
     # No cervix
     '5691', '5684', '5792', '5683', '5714', '5688', '5690', '5954', '6342', '3507', '5677',
-    '5685', '327',
+    '5685', '327', '4331',
     # Blurry
     '1618', '2036', '2095', '2255', '2828', '5696', '5897', '1767', '4763', '4764', '4936',
     '5605', '5610', '5702', '5755', '1063', '2637', '6885', '4550', '4611', '5330', '5433',
-    '5437', '5426', '4224', '5651', '5689', '5705', '5967', '6347'
+    '5437', '5426', '4224', '5651', '5689', '5705', '5967', '6347', '4173', '4354', '4189', 
+    '4575', '4777',
 ]
 try:
     for i in ids_to_remove:    
         additional_type_3_ids.remove(i)
 except ValueError as e:
-    print(e, i)
+    print("Type_3", e, i)
 
 
 # Test data

@@ -86,7 +86,6 @@ def get_trainval_id_type_lists3(n_images_per_class=730, val_split=0.3, seed=2017
             for image_id in ids:
                 id_type_list.append((image_id, image_type))
 
-        #np.random.shuffle(id_type_list)
         assert len(id_type_list) > n_images, "WTF"
         return id_type_list[:n_images]
 
@@ -102,6 +101,10 @@ def get_trainval_id_type_lists3(n_images_per_class=730, val_split=0.3, seed=2017
                                        [type_3_ids, additional_type_3_ids],
                                        ["Type_3", "AType_3"])
 
+    np.random.shuffle(id_type_1_list)
+    np.random.shuffle(id_type_2_list)
+    np.random.shuffle(id_type_3_list)
+    
     train_ll = int(n_images_per_class * (1.0 - val_split))
     train_id_type_list = list(id_type_1_list[:train_ll])
     train_id_type_list.extend(id_type_2_list[:train_ll])
@@ -231,8 +234,8 @@ def segmentation_train(model,
                        seed=None,
                        verbose=1):
 
-    samples_per_epoch = (samples_per_epoch // batch_size) * batch_size
-    nb_val_samples = (nb_val_samples // batch_size) * batch_size
+    samples_per_epoch = (samples_per_epoch // batch_size + 1) * batch_size
+    nb_val_samples = (nb_val_samples // batch_size + 1) * batch_size
 
     if not os.path.exists('weights'):
         os.mkdir('weights')
@@ -384,6 +387,7 @@ def classification_train(model,
                          train_id_type_list,
                          val_id_type_list,
                          option=None,
+                         normalization='',
                          batch_size=16,
                          nb_epochs=10,
                          lrate_decay_f=None,
@@ -394,11 +398,11 @@ def classification_train(model,
                          save_prefix="",
                          verbose=1):
 
-    samples_per_epoch = (samples_per_epoch // batch_size) * batch_size
-    nb_val_samples = (nb_val_samples // batch_size) * batch_size
+    samples_per_epoch = (samples_per_epoch // batch_size + 1) * batch_size
+    nb_val_samples = (nb_val_samples // batch_size + 1) * batch_size
 
     normalize_data = True
-    image_size = (299, 299)
+    image_size = (224, 224)
 
     if not os.path.exists('weights'):
         os.mkdir('weights')
@@ -418,11 +422,11 @@ def classification_train(model,
     train_gen = ImageDataGenerator(pipeline=('random_transform', random_rgb_to_green_generic, 'standardize'),
                                    featurewise_center=normalize_data,
                                    featurewise_std_normalization=normalize_data,
-                                   rotation_range=15.,
-                                   # width_shift_range=0.15, height_shift_range=0.15,
+                                   rotation_range=45.,
+                                   width_shift_range=0.05, height_shift_range=0.05,
                                    # shear_range=3.14/6.0,
-                                   # zoom_range=0.25,
-                                   # channel_shift_range=0.1,
+                                   zoom_range=0.15,
+                                   channel_shift_range=0.1,
                                    horizontal_flip=True,
                                    vertical_flip=True,
                                    fill_mode='constant')
@@ -441,7 +445,7 @@ def classification_train(model,
         raise Exception("Failed to find backend data format")
 
     if normalize_data:
-        if False:
+        if normalization == '':
             print("\n-- Fit stats of train dataset")
             train_gen.fit(xy_provider(train_id_type_list,
                                       image_size=image_size,
@@ -456,11 +460,21 @@ def classification_train(model,
                           save_prefix=save_prefix,
                           batch_size=4,
                           verbose=verbose)
-        else:
+        elif normalization == 'inception' or normalization == 'xception':
             # Preprocessing of Xception: keras/applications/xception.py
+            print("Image normalization: ", normalization)
             train_gen.mean = 0.5
             train_gen.std = 0.5
-
+        elif normalization == 'resnet':
+            print("Image normalization: ", normalization)
+            train_gen.std = 1.0 / 255.0  # Rescale to [0.0, 255.0]
+            m = np.array([123.68, 116.779, 103.939]) / 255.0 # RGB
+            if channels_first:                
+                m = m[:, None, None]
+            else:
+                m = m[None, None, :]
+            train_gen.mean = m
+                                          
     val_gen.mean = train_gen.mean
     val_gen.std = train_gen.std
     val_gen.principal_components = train_gen.principal_components
@@ -541,15 +555,20 @@ def classification_validate(model,
                                  featurewise_std_normalization=normalize_data)
 
     if normalize_data:
-        assert len(save_prefix) > 0, "WTF"
-        # Load mean, std, principal_components if file exists
-        filename = os.path.join(GENERATED_DATA, save_prefix + "_stats.npz")
-        assert os.path.exists(filename), "WTF"
-        print("Load existing file: %s" % filename)
-        npzfile = np.load(filename)
-        val_gen.mean = npzfile['mean']
-        val_gen.std = npzfile['std']
-
+        if False:
+            assert len(save_prefix) > 0, "WTF"
+            # Load mean, std, principal_components if file exists
+            filename = os.path.join(GENERATED_DATA, save_prefix + "_stats.npz")
+            assert os.path.exists(filename), "WTF"
+            print("Load existing file: %s" % filename)
+            npzfile = np.load(filename)
+            val_gen.mean = npzfile['mean']
+            val_gen.std = npzfile['std']
+        else:
+            # Preprocessing of Xception: keras/applications/xception.py
+            val_gen.mean = 0.5
+            val_gen.std = 0.5
+            
     flow = val_gen.flow(xy_provider(val_id_type_list,
                                     image_size=image_size,
                                     option=option,

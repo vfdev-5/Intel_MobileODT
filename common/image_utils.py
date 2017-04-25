@@ -23,6 +23,43 @@ def get_image_bbox(image_id, image_type):
     return npzfile['os_bbox'], npzfile['cervix_bbox'], tuple(npzfile['image_size'])
 
 
+def get_os_image(image_id, image_type, cache=None):
+    os_bbox, cervix_bbox, image_size = get_image_bbox(image_id + "_" + image_type, 'os_cervix_bbox')
+    if cache is not None:
+        key = (image_id, image_type)
+        if key in cache:
+            img = cache.get(key)
+        else:
+            img = get_image_data(image_id, image_type)
+            cache.put(key, img)
+    else:
+        img = get_image_data(image_id, image_type)
+    if img.shape[:2] != image_size:
+        img = cv2.resize(img, dsize=image_size)
+    os_img = img[os_bbox[1]:os_bbox[3], os_bbox[0]:os_bbox[2], :]
+    os_img = cv2.resize(os_img, dsize=image_size)
+    return os_img
+
+
+def get_cervix_image(image_id, image_type, cache=None):
+    os_bbox, cervix_bbox, image_size = get_image_bbox(image_id + "_" + image_type, 'os_cervix_bbox')
+    if cache is not None:
+        key = (image_id, image_type)
+        if key in cache:
+            img = cache.get(key)
+        else:
+            img = get_image_data(image_id, image_type)
+            cache.put(key, img)
+    else:
+        img = get_image_data(image_id, image_type)
+    if img.shape[:2] != image_size:
+        img = cv2.resize(img, dsize=image_size)
+    cervix_img = img[cervix_bbox[1]:cervix_bbox[3], cervix_bbox[0]:cervix_bbox[2], :]
+    cervix_img = cv2.resize(cervix_img, dsize=image_size)
+    return cervix_img
+
+
+
 def imwrite(img, image_id, image_type):
     output_filename = get_filename(image_id, image_type)
     if 'label' in image_type and 'gray' not in image_type:

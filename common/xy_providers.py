@@ -3,7 +3,7 @@ import os
 import numpy as np
 import cv2
 
-from image_utils import get_image_data, get_image_bbox
+from image_utils import get_image_data, get_image_bbox, get_os_image, get_cervix_image
 from data_utils import type_to_index
 
 
@@ -100,6 +100,10 @@ class DataCache(object):
     def get(self, data_id):
         return self.cache[data_id]
 
+    def remove(self, data_id):
+        self.ids_queue.remove(data_id)
+        self.cache.pop(data_id)        
+        
     def __contains__(self, key):
         return key in self.cache and key in self.ids_queue
 
@@ -192,42 +196,6 @@ def cached_image_provider(image_id_type_list,
             cache.put(key, (img, None))
 
         yield img, None, (image_id, image_type)
-
-
-def get_os_image(image_id, image_type, cache=None):
-    os_bbox, cervix_bbox, image_size = get_image_bbox(image_id + "_" + image_type, 'os_cervix_bbox')
-    if cache is not None:
-        key = (image_id, image_type)
-        if key in cache:
-            img = cache.get(key)
-        else:
-            img = get_image_data(image_id, image_type)
-            cache.put(key, img)
-    else:
-        img = get_image_data(image_id, image_type)
-    if img.shape[:2] != image_size:
-        img = cv2.resize(img, dsize=image_size)
-    os_img = img[os_bbox[1]:os_bbox[3], os_bbox[0]:os_bbox[2], :]
-    os_img = cv2.resize(os_img, dsize=image_size)
-    return os_img
-
-
-def get_cervix_image(image_id, image_type, cache=None):
-    os_bbox, cervix_bbox, image_size = get_image_bbox(image_id + "_" + image_type, 'os_cervix_bbox')
-    if cache is not None:
-        key = (image_id, image_type)
-        if key in cache:
-            img = cache.get(key)
-        else:
-            img = get_image_data(image_id, image_type)
-            cache.put(key, img)
-    else:
-        img = get_image_data(image_id, image_type)
-    if img.shape[:2] != image_size:
-        img = cv2.resize(img, dsize=image_size)
-    cervix_img = img[cervix_bbox[1]:cervix_bbox[3], cervix_bbox[0]:cervix_bbox[2], :]
-    cervix_img = cv2.resize(cervix_img, dsize=image_size)
-    return cervix_img
 
 
 def cached_image_label_provider(image_id_type_list,
