@@ -1,7 +1,7 @@
 LABELS = (
     {"attributes":
          {"type": "point",
-          "class": "Nat"},
+          "class": "Natural"},
      "item": "sloth.items.PointItem",
      "inserter": "sloth.items.PointItemInserter",
      "hotkey": 'q',
@@ -9,7 +9,7 @@ LABELS = (
      },
     {"attributes":
          {"type": "point",
-          "class": "AA"},
+          "class": "Acetic Acid"},
      "item": "sloth.items.PointItem",
      "inserter": "sloth.items.PointItemInserter",
      "hotkey": 'w',
@@ -21,11 +21,11 @@ LABELS = (
      "item": "sloth.items.PointItem",
      "inserter": "sloth.items.PointItemInserter",
      "hotkey": 'e',
-     "text": "LI"
+     "text": "Lugol iodine"
      },
     {"attributes":
          {"type": "point",
-          "class": "GR"},
+          "class": "Green"},
      "item": "sloth.items.PointItem",
      "inserter": "sloth.items.PointItemInserter",
      "hotkey": 'r',

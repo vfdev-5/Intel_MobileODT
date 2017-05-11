@@ -155,6 +155,7 @@ class ImageDataIterator(Iterator):
             x, y, info = ret if len(ret) > 2 else (ret[0], ret[1], None)
 
         batch_x = np.zeros((current_batch_size,) + x.shape, dtype=K.floatx())
+        # Y can be None if ImageDataIterator is used to iterate over test data
         if y is not None:
             batch_y = self._create_y_batch(current_batch_size, x=x, y=y)
         else:

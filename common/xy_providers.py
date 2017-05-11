@@ -32,7 +32,9 @@ def image_mask_provider(image_id_type_list,
                         test_mode=False,
                         save_to_dir=None,
                         verbose=0):
+    image_id_type_list = list(image_id_type_list)
     while True:
+        np.random.shuffle(image_id_type_list)
         for i, (image_id, image_type) in enumerate(image_id_type_list):
             if verbose > 0:
                 print("Image id/type:", image_id, image_type, "| counter=", i)
@@ -128,7 +130,9 @@ def cached_image_mask_provider(image_id_type_list,
             print("Initialize cache : %i" % cache.n_samples)
 
     counter = 0
+    image_id_type_list = list(image_id_type_list)
     while True:
+        np.random.shuffle(image_id_type_list)
         for i, (image_id, image_type) in enumerate(image_id_type_list):
             if verbose > 0:
                 print("Image id/type:", image_id, image_type, "| counter=", i)
@@ -171,6 +175,7 @@ def cached_image_mask_provider(image_id_type_list,
 def cached_image_provider(image_id_type_list,
                           image_size=(224, 224),
                           channels_first=True,
+                          option="",
                           cache=None,
                           verbose=0):
     if cache is None:
@@ -184,7 +189,13 @@ def cached_image_provider(image_id_type_list,
         if key in cache:
             img, _ = cache.get(key)
         else:
-            img = get_image_data(image_id, image_type)
+            if option == 'cervix':
+                img = get_cervix_image(image_id, image_type)
+            elif option == 'os':
+                img = get_os_image(image_id, image_type)
+            else:
+                img = get_image_data(image_id, image_type)
+
             if img.dtype.kind is not 'u':
                 if verbose > 0:
                     print("Image is corrupted. Id/Type:", image_id, image_type)
@@ -217,7 +228,9 @@ def cached_image_label_provider(image_id_type_list,
             print("Initialize cache : %i" % cache.n_samples)
 
     counter = 0
+    image_id_type_list = list(image_id_type_list)
     while True:
+        np.random.shuffle(image_id_type_list)
         for i, (image_id, image_type) in enumerate(image_id_type_list):
             if verbose > 0:
                 print("Image id/type:", image_id, image_type, "| counter=", i)
@@ -227,6 +240,15 @@ def cached_image_label_provider(image_id_type_list,
                 if verbose > 0:
                     print("-- Load from RAM")
                 img, label = cache.get(key)
+                
+                if channels_first:
+                    if img.shape[1:] != image_size[::-1]:
+                        img = img.transpose([1, 2, 0])
+                        img = cv2.resize(img, dsize=image_size[::-1])
+                        img = img.transpose([2, 0, 1])
+                else:
+                    if img.shape[:2] != image_size[::-1]:
+                        img = cv2.resize(img, dsize=image_size[::-1])                
             else:
                 if verbose > 0:
                     print("-- Load from disk")

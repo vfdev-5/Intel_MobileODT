@@ -21,16 +21,15 @@ from xy_providers import cached_image_mask_provider, cached_image_label_provider
 
 # Local keras-contrib:
 from preprocessing.image.generators import ImageMaskGenerator, ImageDataGenerator
-from preprocessing.image.iterators import ImageMaskIterator, ImageDataIterator
 
 
-def find_best_weights_file(weights_files):
+def find_best_weights_file(weights_files, start_index=None, end_index=-3):
     best_val_loss = 1e5
     best_weights_filename = ""
     for f in weights_files:
-        index = os.path.basename(f).index('-')
-        end_index = -3
-        loss_str = os.path.basename(f)[index+1:end_index]
+        if start_index is None:
+            start_index = os.path.basename(f).index('-')
+        loss_str = os.path.basename(f)[start_index+1:end_index]
         if '-' in loss_str:
             end_index = loss_str.index('-')
             loss_str = loss_str[:end_index]
@@ -39,6 +38,32 @@ def find_best_weights_file(weights_files):
             best_val_loss = loss
             best_weights_filename = f
     return best_weights_filename, best_val_loss
+
+
+def find_best_weights_file2(weights_files, field_name='val_loss', best_min=True):
+    
+    best_value = 1e5 if best_min else -1e5    
+    if best_min:
+        best_value = 1e5
+        comp = lambda a, b: a > b
+    else:
+        best_value = -1e5
+        comp = lambda a, b: a < b
+        
+    if '=' != field_name[-1]:
+        field_name += '='
+   
+    best_weights_filename = ""
+    for f in weights_files:
+        index = f.find(field_name)
+        index += len(field_name)
+        assert index >= 0, "Field name '%s' is not found in '%s'" % (field_name, f)
+        end = f.find('_', index)
+        val = float(f[index:end])
+        if comp(best_value, val):
+            best_value = val
+            best_weights_filename = f
+    return best_weights_filename, best_value
 
 
 def get_trainval_id_type_lists(val_split=0.3, type_ids=(type_1_ids, type_2_ids, type_3_ids)):
@@ -87,7 +112,9 @@ def get_trainval_id_type_lists3(n_images_per_class=730, val_split=0.3, seed=2017
                 id_type_list.append((image_id, image_type))
 
         assert len(id_type_list) > n_images, "WTF"
-        return id_type_list[:n_images]
+        id_type_list = id_type_list[:n_images]
+        np.random.shuffle(id_type_list)
+        return id_type_list
 
     id_type_1_list = _get_id_type_list(n_images_per_class,
                                        [type_1_ids, additional_type_1_ids],
@@ -101,10 +128,9 @@ def get_trainval_id_type_lists3(n_images_per_class=730, val_split=0.3, seed=2017
                                        [type_3_ids, additional_type_3_ids],
                                        ["Type_3", "AType_3"])
 
-    np.random.shuffle(id_type_1_list)
-    np.random.shuffle(id_type_2_list)
-    np.random.shuffle(id_type_3_list)
-    
+    #print(len(id_type_1_list), len(id_type_2_list), len(id_type_3_list))
+    #print(id_type_1_list[:2], id_type_2_list[:2], id_type_3_list[:2])
+
     train_ll = int(n_images_per_class * (1.0 - val_split))
     train_id_type_list = list(id_type_1_list[:train_ll])
     train_id_type_list.extend(id_type_2_list[:train_ll])
@@ -156,6 +182,36 @@ def get_trainval_id_type_lists2(annotations, val_split=0.3):
     return train_id_type_list, val_id_type_list
 
 
+def get_all_trainval_id_type_list(n_images_per_class=1400):
+    # Number of train images per one class
+
+    def get_id_type_list(n_images, type_ids, image_types):
+        id_type_list = []
+        for ids, image_type in zip(type_ids, image_types):
+            for image_id in ids:
+                id_type_list.append((image_id, image_type))
+
+        assert len(id_type_list) > n_images, "WTF: %i, %i" % (len(id_type_list), n_images)
+        return id_type_list[:n_images] if n_images > 0 else id_type_list
+
+    id_type_1_list = get_id_type_list(n_images_per_class,
+                                      [type_1_ids, additional_type_1_ids],
+                                      ["Type_1", "AType_1"])
+
+    id_type_2_list = get_id_type_list(n_images_per_class,
+                                      [type_2_ids, additional_type_2_ids],
+                                      ["Type_2", "AType_2"])
+
+    id_type_3_list = get_id_type_list(n_images_per_class,
+                                      [type_3_ids, additional_type_3_ids],
+                                      ["Type_3", "AType_3"])
+
+    all_trainval_id_type_list = list(id_type_1_list)
+    all_trainval_id_type_list.extend(id_type_2_list)
+    all_trainval_id_type_list.extend(id_type_3_list)
+    return all_trainval_id_type_list
+
+
 def compute_mean_std_images(image_id_type_list, output_size=(224, 224), feature_wise=False, verbose=0):
     """
     Method to compute mean/std input image
@@ -191,8 +247,12 @@ def compute_mean_std_images(image_id_type_list, output_size=(224, 224), feature_
     return mean_image, std_image
 
 
-def exp_decay(epoch, lr=1e-3, a=0.925):
-    return lr * np.exp(-(1.0 - a) * epoch)
+def exp_decay(epoch, lr=1e-3, a=0.925, init_epoch=0):
+    return lr * np.exp(-(1.0 - a) * (epoch + init_epoch))
+
+
+def step_decay(epoch, lr=1e-3, base=2.0, period=50, init_epoch=0):
+    return lr * base ** (-np.floor((epoch + init_epoch) * 1.0 / period))
 
 
 def random_rgb_to_green_generic(*args):
@@ -387,13 +447,16 @@ def classification_train(model,
                          train_id_type_list,
                          val_id_type_list,
                          option=None,
+                         normalize_data=True,
                          normalization='',
                          batch_size=16,
                          nb_epochs=10,
+                         image_size=(224, 224),
                          lrate_decay_f=None,
                          samples_per_epoch=2048,
                          nb_val_samples=1024,
                          xy_provider_cache=None,
+                         class_weight={},
                          seed=None,
                          save_prefix="",
                          verbose=1):
@@ -401,14 +464,14 @@ def classification_train(model,
     samples_per_epoch = (samples_per_epoch // batch_size + 1) * batch_size
     nb_val_samples = (nb_val_samples // batch_size + 1) * batch_size
 
-    normalize_data = True
-    image_size = (224, 224)
-
     if not os.path.exists('weights'):
         os.mkdir('weights')
 
-    weights_filename = os.path.join("weights", save_prefix + "_{epoch:02d}-{val_loss:.4f}.h5")
-    model_checkpoint = ModelCheckpoint(weights_filename, monitor='loss', save_best_only=True)
+    weights_filename = os.path.join("weights", save_prefix +
+                                    "_{epoch:02d}_val_loss={val_loss:.4f}_" +
+                                    "val_acc={val_acc:.4f}_val_precision={val_precision:.4f}_" +
+                                    "val_recall={val_recall:.4f}.h5")
+    model_checkpoint = ModelCheckpoint(weights_filename, monitor='val_loss', save_best_only=True)
     callbacks = [model_checkpoint, ]
     if lrate_decay_f is not None:
         lrate = LearningRateScheduler(lrate_decay_f)
@@ -422,11 +485,11 @@ def classification_train(model,
     train_gen = ImageDataGenerator(pipeline=('random_transform', random_rgb_to_green_generic, 'standardize'),
                                    featurewise_center=normalize_data,
                                    featurewise_std_normalization=normalize_data,
-                                   rotation_range=45.,
-                                   width_shift_range=0.05, height_shift_range=0.05,
+                                   rotation_range=90.,
+                                   width_shift_range=0.25, height_shift_range=0.25,
                                    # shear_range=3.14/6.0,
-                                   zoom_range=0.15,
-                                   channel_shift_range=0.1,
+                                   zoom_range=0.35,
+                                   # channel_shift_range=0.1,
                                    horizontal_flip=True,
                                    vertical_flip=True,
                                    fill_mode='constant')
@@ -465,7 +528,7 @@ def classification_train(model,
             print("Image normalization: ", normalization)
             train_gen.mean = 0.5
             train_gen.std = 0.5
-        elif normalization == 'resnet':
+        elif normalization == 'resnet' or normalization == 'vgg':
             print("Image normalization: ", normalization)
             train_gen.std = 1.0 / 255.0  # Rescale to [0.0, 255.0]
             m = np.array([123.68, 116.779, 103.939]) / 255.0 # RGB
@@ -513,6 +576,7 @@ def classification_train(model,
                                           validation_data=val_flow,
                                           validation_steps=(nb_val_samples // batch_size),
                                           callbacks=callbacks,
+                                          class_weight=class_weight,
                                           verbose=verbose)
         else:
             history = model.fit_generator(generator=train_flow,
@@ -521,10 +585,18 @@ def classification_train(model,
                                           validation_data=val_flow,
                                           nb_val_samples=nb_val_samples,
                                           callbacks=callbacks,
+                                          class_weight=class_weight,
                                           verbose=verbose)
         # save the last
         val_loss = history.history['val_loss'][-1]
-        weights_filename = weights_filename.format(epoch=nb_epochs, val_loss=val_loss)
+        val_acc = history.history['val_acc'][-1]
+        val_recall = history.history['val_recall'][-1]
+        val_precision = history.history['val_precision'][-1]
+        weights_filename = weights_filename.format(epoch=nb_epochs,
+                                                   val_loss=val_loss,
+                                                   val_acc=val_acc,
+                                                   val_precision=val_precision,
+                                                   val_recall=val_recall)
         model.save_weights(weights_filename)
         return history
 
@@ -535,13 +607,14 @@ def classification_train(model,
 def classification_validate(model,
                             val_id_type_list,
                             option=None,
+                            normalize_data=True,
+                            normalization='',
+                            image_size=(224, 224),
                             save_prefix="",
                             batch_size=16,
                             xy_provider_cache=None):
 
-    normalize_data = True
-    image_size = (224, 224)
-
+    
     if hasattr(K, 'image_data_format'):
         channels_first = K.image_data_format() == 'channels_first'
     elif hasattr(K, 'image_dim_ordering'):
@@ -555,7 +628,7 @@ def classification_validate(model,
                                  featurewise_std_normalization=normalize_data)
 
     if normalize_data:
-        if False:
+        if normalization == '':
             assert len(save_prefix) > 0, "WTF"
             # Load mean, std, principal_components if file exists
             filename = os.path.join(GENERATED_DATA, save_prefix + "_stats.npz")
@@ -564,10 +637,20 @@ def classification_validate(model,
             npzfile = np.load(filename)
             val_gen.mean = npzfile['mean']
             val_gen.std = npzfile['std']
-        else:
+        elif normalization == 'inception' or normalization == 'xception':
             # Preprocessing of Xception: keras/applications/xception.py
+            print("Image normalization: ", normalization)
             val_gen.mean = 0.5
             val_gen.std = 0.5
+        elif normalization == 'resnet' or normalization == 'vgg':
+            print("Image normalization: ", normalization)
+            val_gen.std = 1.0 / 255.0  # Rescale to [0.0, 255.0]
+            m = np.array([123.68, 116.779, 103.939]) / 255.0 # RGB
+            if channels_first:                
+                m = m[:, None, None]
+            else:
+                m = m[None, None, :]
+            val_gen.mean = m   
             
     flow = val_gen.flow(xy_provider(val_id_type_list,
                                     image_size=image_size,
