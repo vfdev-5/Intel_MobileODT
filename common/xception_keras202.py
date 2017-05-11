@@ -24,10 +24,9 @@ def get_xception(trained=True, finetuning=True, optimizer='adadelta', lr=0.01):
 
     if finetuning:
         names_to_train=[
-            # 'block13_sepconv1', 'block13_sepconv1_bn',
-            # 'block13_sepconv2', 'block13_sepconv2_bn',
-            # 'block14_sepconv1', 'block14_sepconv1_bn',
-            'block14_sepconv2', 'block14_sepconv2_bn',
+            # 'block13_sepconv1', 'block13_sepconv1_bn', 'block13_sepconv2', 'block13_sepconv2_bn',
+            
+            'block14_sepconv1', 'block14_sepconv1_bn', 'block14_sepconv2', 'block14_sepconv2_bn',
         ]
         for layer in base_model.layers:
             if layer.name in names_to_train:
@@ -37,8 +36,7 @@ def get_xception(trained=True, finetuning=True, optimizer='adadelta', lr=0.01):
 
     x = base_model.output
     x = Dropout(0.5)(x)
-    # output = Dense(3, activation='softmax')(x)
-    output = Dense(3, activation='sigmoid')(x)
+    output = Dense(3, activation='softmax')(x)    
     model = Model(inputs=base_model.input, outputs=output)
 
     
@@ -53,7 +51,6 @@ def get_xception(trained=True, finetuning=True, optimizer='adadelta', lr=0.01):
     else:
         raise Exception("Optimizer '%s' is unknown" % optimizer)
 
-    # model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy', ])        
     model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy', ])
     return model
 

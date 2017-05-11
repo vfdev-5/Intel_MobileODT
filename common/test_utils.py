@@ -83,13 +83,15 @@ def segmentation_predict(model,
 
 def classification_predict(model,
                            test_id_type_list,
+                           option=None,
+                           normalize_data=True,
+                           normalization='',
+                           image_size=(224, 224),
                            batch_size=16,
                            save_prefix="",
                            info='',
                            xy_provider_cache=None):
 
-    normalize_data = True
-    image_size = (299, 299)
 
     if hasattr(K, 'image_data_format'):
         channels_first = K.image_data_format() == 'channels_first'
@@ -102,17 +104,33 @@ def classification_predict(model,
                                   featurewise_std_normalization=normalize_data)
 
     if normalize_data:
-        assert len(save_prefix) > 0, "WTF"
-        # Load mean, std, principal_components if file exists
-        filename = os.path.join(GENERATED_DATA, save_prefix + "_stats.npz")
-        assert os.path.exists(filename), "WTF"
-        print("Load existing file: %s" % filename)
-        npzfile = np.load(filename)
-        test_gen.mean = npzfile['mean']
-        test_gen.std = npzfile['std']
-
+        if normalization == '':
+            assert len(save_prefix) > 0, "WTF"
+            # Load mean, std, principal_components if file exists
+            filename = os.path.join(GENERATED_DATA, save_prefix + "_stats.npz")
+            assert os.path.exists(filename), "WTF"
+            print("Load existing file: %s" % filename)
+            npzfile = np.load(filename)
+            test_gen.mean = npzfile['mean']
+            test_gen.std = npzfile['std']
+        elif normalization == 'inception' or normalization == 'xception':
+            # Preprocessing of Xception: keras/applications/xception.py
+            print("Image normalization: ", normalization)
+            test_gen.mean = 0.5
+            test_gen.std = 0.5
+        elif normalization == 'resnet' or normalization == 'vgg':
+            print("Image normalization: ", normalization)
+            test_gen.std = 1.0 / 255.0  # Rescale to [0.0, 255.0]
+            m = np.array([123.68, 116.779, 103.939]) / 255.0 # RGB
+            if channels_first:                
+                m = m[:, None, None]
+            else:
+                m = m[None, None, :]
+            test_gen.mean = m 
+            
     flow = test_gen.flow(xy_provider(test_id_type_list,
                                      image_size=image_size,
+                                     option=option,
                                      channels_first=channels_first,
                                      cache=xy_provider_cache),
                          # Ensure that all batches have the same size
@@ -124,6 +142,8 @@ def classification_predict(model,
     ll = len(test_id_type_list)
     for x, _, image_ids in flow:
         y_pred = model.predict(x)
+        # Threshold predictions
+        y_pred = (y_pred > 0.5).astype(np.float32)
         s = x.shape[0]
         print("--", total_counter, '/', ll)
         for i in range(s):
@@ -134,3 +154,4 @@ def classification_predict(model,
     sub_file = 'submission_' + info + '_' + str(now.strftime("%Y-%m-%d-%H-%M")) + '.csv'
     sub_file = os.path.join('..', 'results', sub_file)
     df.to_csv(sub_file, index=False)
+    

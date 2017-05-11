@@ -10,7 +10,7 @@ assert __version__ == '1.2.2', "Wrong Keras version : %s" % __version__
 set_image_dim_ordering('th')
 
 
-def get_vgg16(trained=True, finetuning=True, optimizer='adadelta', lr=0.01):
+def get_vgg16(trained=True, finetuning=True, optimizer='adadelta', lr=0.01, image_size=(224, 224), names_to_train=None):
     """
     Method get VGG16 model from keras applications, adapt inputs and outputs and return compiled model
     """
@@ -18,18 +18,34 @@ def get_vgg16(trained=True, finetuning=True, optimizer='adadelta', lr=0.01):
         assert not finetuning, "WTF"
 
     weights = 'imagenet' if trained else None
-    base_model = VGG16(include_top=True, input_tensor=None, classes=3,
-                              input_shape=(3, 224, 224), weights=weights)
+    base_model = VGG16(include_top=False, input_tensor=None, classes=3,
+                              input_shape=(3,) + image_size[::-1], weights=weights)
 
     if finetuning:
-        names_to_train=[]
+        if names_to_train is None:
+            names_to_train=[            
+                #'block3_conv1',
+                #'block3_conv2',
+                #'block3_conv3',
+
+                #'block4_conv1',
+                #'block4_conv2',
+                #'block4_conv3',
+
+                'block5_conv1',
+                'block5_conv2',
+                'block5_conv3',
+            ]
         for layer in base_model.layers:
             if layer.name in names_to_train:
                 layer.trainable = True
             else:
                 layer.trainable = False
 
-    model = base_model
+    x = Flatten()(base_model.output)
+    output = Dense(3, activation='softmax', name='output')(x)
+    model = Model(input=base_model.input, output=output)
+
 
     if optimizer == 'adadelta':
         opt = Adadelta(lr=lr)
@@ -37,5 +53,5 @@ def get_vgg16(trained=True, finetuning=True, optimizer='adadelta', lr=0.01):
         opt = Adam(lr=lr)
     else:
         raise Exception("Optimizer '%s' is unknown" % optimizer)
-    model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy', ])
+    model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy', 'precision', 'recall'])
     return model

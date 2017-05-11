@@ -12,7 +12,7 @@ def logloss_mc(y_true, y_prob, epsilon=1e-15):
     y_prob is ndarray of shape (n_samples, n_classes), probabilities
     """
     # normalize
-    y_prob = y_prob / y_prob.sum(axis=1).reshape(-1, 1)
+    y_prob = y_prob / (y_prob.sum(axis=1).reshape(-1, 1) + epsilon) 
     y_prob = np.maximum(epsilon, y_prob)
     y_prob = np.minimum(1 - epsilon, y_prob)
     # get probabilities

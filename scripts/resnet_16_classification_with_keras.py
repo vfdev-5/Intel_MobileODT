@@ -1,6 +1,11 @@
 
 # coding: utf-8
 
+#
+# To launch on Colfax : 
+# qsub -V 
+#
+
 # # Trained ResNet-50 classification on os images
 # Test combination:
 # 
