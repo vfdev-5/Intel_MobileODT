@@ -5,12 +5,8 @@ import platform
 from glob import glob
 
 
-if 'c001' in platform.node():
-    DATA_PATH = "/data/kaggle"
-    INPUT_PATH = os.path.abspath("../input")
-else:
-    DATA_PATH = os.path.abspath("../input")
-    INPUT_PATH = DATA_PATH
+DATA_PATH = os.path.abspath("../input")
+INPUT_PATH = DATA_PATH
 
 
 TRAIN_DATA = os.path.join(DATA_PATH, "train")
