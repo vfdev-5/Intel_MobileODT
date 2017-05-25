@@ -3,13 +3,15 @@ import os
 import json 
 import platform
 from glob import glob
+import numpy as np
 
+project_common_path = os.path.dirname(__file__)
 
 if 'c001' in platform.node():
     DATA_PATH = "/data/kaggle"
-    INPUT_PATH = os.path.abspath("../input")
+    INPUT_PATH = os.path.abspath(os.path.join(project_common_path, "..", "input"))
 else:
-    DATA_PATH = os.path.abspath("../input")
+    DATA_PATH = os.path.abspath(os.path.join(project_common_path, "..", "input"))
     INPUT_PATH = DATA_PATH
 
 
@@ -17,7 +19,7 @@ TRAIN_DATA = os.path.join(DATA_PATH, "train")
 TEST_DATA = os.path.join(DATA_PATH, "test")
 ADDITIONAL_DATA = os.path.join(DATA_PATH, "additional")
 
-RESOURCES_PATH = os.path.abspath("../resources")
+RESOURCES_PATH = os.path.abspath(os.path.join(project_common_path, "..", "resources"))
 GENERATED_DATA = os.path.join(INPUT_PATH, 'generated')
 
 if not os.path.exists(GENERATED_DATA):
@@ -214,3 +216,54 @@ def get_annotations(filename):
             if len(item['annotations']) > 0:
                 labels.append(item)
     return labels
+
+
+def get_id_type_list_from_annotations(annotations, select=None):
+    id_type_list = []
+    select_set = set(select) if select is not None else set()
+
+    for annotation in annotations:
+
+        if select is not None:
+            class_types = [str(a['class']) for a in annotation['annotations']]
+            if len(set(class_types) & select_set) == 0:
+                continue
+
+        image_name = annotation['filename']
+        image_id = os.path.basename(image_name)[:-4]
+        splt = os.path.split(os.path.dirname(image_name))
+        if os.path.basename(splt[0]).lower() == "train":
+            image_type = splt[1]
+        elif os.path.basename(splt[0]).lower() == "additional":
+            image_type = "A" + splt[1]
+        else:
+            raise Exception("Unknown type : %s" % os.path.basename(splt[0]))
+        id_type_list.append((image_id, image_type))
+    return id_type_list
+
+
+def compute_type_distribution(id_type_list):
+    types = (('Type_1', 'AType_1'), ('Type_2', 'AType_2'), ('Type_3', 'AType_3'))
+    ll = len(id_type_list)
+    out = [0.0, 0.0, 0.0]
+    for i, ts in enumerate(types):
+        for t in ts:
+            out[i] += (id_type_list[:, 1] == t).sum()
+        out[i] *= 1.0 / ll
+    return out
+
+
+def to_set(id_type_array):
+    return set([(i[0], i[1]) for i in id_type_array.tolist()])
+
+
+def remove_green_imagery(id_type_list):
+    output = list(id_type_list)
+    green_id_type_path = os.path.join(GENERATED_DATA, "green_id_type_list.npz")
+    assert os.path.exists(green_id_type_path)
+    green_id_type_list = np.load(green_id_type_path)['green_id_type_list'].astype(str)
+    green_id_type_set = to_set(green_id_type_list)
+    common_green_id_type_list = list(set(id_type_list) & green_id_type_set)
+    for k in common_green_id_type_list:
+        output.remove(k)
+    return output

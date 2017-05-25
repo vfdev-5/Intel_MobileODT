@@ -46,7 +46,7 @@ def classification_train(model,
                                     "val_recall={val_recall:.4f}.h5")
 
     model_checkpoint = ModelCheckpoint(weights_filename, monitor='val_loss', save_best_only=True)
-    early_stop = EarlyStopping(monitor='val_loss', patience=7, min_delta=0.01, verbose=0)
+    early_stop = EarlyStopping(monitor='val_loss', patience=10, min_delta=0.001, verbose=0)
     
     callbacks = [model_checkpoint, early_stop, ]
     if lrate_decay_f is not None:

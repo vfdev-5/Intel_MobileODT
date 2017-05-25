@@ -211,11 +211,15 @@ def cached_image_provider(image_id_type_list,
 
 def cached_image_label_provider(image_id_type_list,
                                 image_size,
-                                option=None,  # 'cervix' or 'os'
+                                option=None,  # 'cervix', 'os' or 'cervix/os'
                                 channels_first=True,
                                 test_mode=False,
                                 cache=None,
+                                seed=None,
                                 verbose=0):
+
+    if seed is not None:
+        np.random.seed(seed)
 
     if cache is None:
         img = get_image_data(*image_id_type_list[0])
@@ -235,7 +239,7 @@ def cached_image_label_provider(image_id_type_list,
             if verbose > 0:
                 print("Image id/type:", image_id, image_type, "| counter=", i)
 
-            key = (image_id, image_type)
+            key = (image_id, image_type, option)
             if key in cache:
                 if verbose > 0:
                     print("-- Load from RAM")
@@ -248,7 +252,7 @@ def cached_image_label_provider(image_id_type_list,
                         img = img.transpose([2, 0, 1])
                 else:
                     if img.shape[:2] != image_size[::-1]:
-                        img = cv2.resize(img, dsize=image_size[::-1])                
+                        img = cv2.resize(img, dsize=image_size[::-1])
             else:
                 if verbose > 0:
                     print("-- Load from disk")
@@ -262,10 +266,10 @@ def cached_image_label_provider(image_id_type_list,
 
                 if img.shape[:2] != image_size:
                     img = cv2.resize(img, dsize=image_size)
-
                 if channels_first:
                     img = img.transpose([2, 0, 1])
                 img = img.astype(np.float32) / 255.0
+
                 label = np.array([0, 0, 0], dtype=np.uint8)
                 label[type_to_index[image_type]] = 1
                 # fill the cache only at first time:

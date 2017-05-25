@@ -66,11 +66,12 @@ def get_unet(input_shape, n_classes, n_filters=32, optimizer='adam'):
     outputs = Activation("sigmoid")(x)
     
     model = Model(input=inputs, output=outputs)
-    if optimizer == 'adam':
-        opt = Adam(lr=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-    elif optimizer == 'adadelta':
-        opt = Adadelta()
-    else:
-        raise Exception("Optimizer '%s' is unknown" % optimizer)
-    model.compile(optimizer=opt, loss=jaccard_loss, metrics=[jaccard_index, 'recall', 'precision'])
+    if optimizer is not None:
+        if optimizer == 'adam':
+            opt = Adam(lr=1e-3, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+        elif optimizer == 'adadelta':
+            opt = Adadelta()
+        else:
+            raise Exception("Optimizer '%s' is unknown" % optimizer)
+        model.compile(optimizer=opt, loss=jaccard_loss, metrics=[jaccard_index, 'recall', 'precision'])
     return model

@@ -48,10 +48,7 @@ def segmentation_predict(model,
                          image_size=(224, 224)):
 
     test_gen = ImageMaskGenerator(featurewise_center=True,
-                                  featurewise_std_normalization=True,
-                                  rotation_range=90.,
-                                  horizontal_flip=True,
-                                  vertical_flip=True)
+                                  featurewise_std_normalization=True)
 
     assert len(save_prefix) > 0, "WTF"
     # Load mean, std, principal_components if file exists
@@ -65,18 +62,19 @@ def segmentation_predict(model,
     flow = test_gen.flow(xy_provider(test_id_type_list,
                                      image_size=image_size,
                                      cache=xy_provider_cache),
-                         # Ensure that all batches have the same size
                          len(test_id_type_list),
                          batch_size=batch_size)
 
     total_counter = 0
+    ll = len(test_id_type_list)
     for x, _, info in flow:
         y_pred = model.predict(x)
         s = y_pred.shape[0]
         for i in range(s):
             total_counter += 1
-            print("--", total_counter, info[i])
-            imwrite(y_pred[i, :, :, :], info[i][0] + '_' + info[i][1], 'pred_label')
+            print('-- %i / %i : %s, %s' % (total_counter, ll, info[i][0], info[i][1]))
+            image_id = info[i][0] + '_' + info[i][1]
+            imwrite(y_pred[i, :, :, :].transpose([1, 2, 0]), image_id, 'os_cervix_label__%s' % save_prefix)
 
 
 # ###### Classification #######

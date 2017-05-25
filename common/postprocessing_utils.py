@@ -132,6 +132,23 @@ def os_cervix_postproc_batch(y_pred):
     return y_pred
 
 
+def os_cervix_merge_masks(os_cervix_mask_1, os_cervix_mask_2, a=0.5, b=0.5):
+    os_cervix_1_sum = np.sum(os_cervix_mask_1 > 0.5, axis=(0, 1))
+    os_cervix_2_sum = np.sum(os_cervix_mask_2 > 0.5, axis=(0, 1))
+    os_cervix_indices = np.abs(os_cervix_1_sum - os_cervix_2_sum) * 1.0 / (os_cervix_1_sum + os_cervix_2_sum + 1e-7)    
+    
+    final_os_cervix_mask = np.zeros_like(os_cervix_mask_1)    
+    for i in range(2):
+        if os_cervix_indices[i] < 0.5:
+            final_os_cervix_mask[:,:,i] = a * os_cervix_mask_1[:,:,i] + b * os_cervix_mask_2[:,:,i]
+        else:
+            if os_cervix_1_sum[i] > os_cervix_2_sum[i]:
+                final_os_cervix_mask[:,:,i] = os_cervix_mask_1[:,:,i]
+            else:
+                final_os_cervix_mask[:,:,i] = os_cervix_mask_2[:,:,i]
+    return final_os_cervix_mask
+
+
 def get_bbox(mask):
     img_proj_x = np.sum(mask, axis=0)
     img_proj_y = np.sum(mask, axis=1)

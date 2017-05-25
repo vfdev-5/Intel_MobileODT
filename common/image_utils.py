@@ -8,13 +8,24 @@ import numpy as np
 from data_utils import get_filename
 
 
-def get_image_data(image_id, image_type, return_shape_only=False):
+def get_image_data(image_id, image_type, return_shape_only=False, cache=None):
     """
     Method to get image data as np.array specifying image id and type
     """
+    if cache is not None:
+        key = (image_id, image_type)
+        if key in cache:
+            return cache.get(key)
+
     if 'label' in image_type and 'gray' not in image_type:
-        return np.load(get_filename(image_id, image_type))['arr_0']
-    return _get_image_data_pil(image_id, image_type, return_shape_only=return_shape_only)
+        img = np.load(get_filename(image_id, image_type))['arr_0']
+    else:
+        img = _get_image_data_pil(image_id, image_type, return_shape_only=return_shape_only)
+
+    if cache is not None:
+        key = (image_id, image_type)
+        cache.put(key, img)
+    return img
 
 
 def get_image_bbox(image_id, image_type):
@@ -57,7 +68,6 @@ def get_cervix_image(image_id, image_type, cache=None):
     cervix_img = img[cervix_bbox[1]:cervix_bbox[3], cervix_bbox[0]:cervix_bbox[2], :]
     cervix_img = cv2.resize(cervix_img, dsize=image_size)
     return cervix_img
-
 
 
 def imwrite(img, image_id, image_type):
@@ -158,11 +168,19 @@ def generate_label_images(annotations):
         if os.path.exists(get_filename(image_id + '_' + image_type, 'trainval_label_0')):
             continue
 
+        do_write = False
+        for label in annotation['annotations']:
+            if label['type'] != u'rect':
+                continue
+            do_write = True
+
+        if not do_write:
+            continue
+
         src_shape = get_image_data(image_id, image_type, return_shape_only=True)
         label_image = np.zeros(src_shape[:2] + (ll,), dtype=np.uint8)
         h, w, _ = label_image.shape
         for label in annotation['annotations']:
-            assert label['type'] == u'rect', "Type '%s' is not supported" % label['type']
             index = label_to_index(label['class'])
             pt1 = (_clamp(int(label['x']), w), _clamp(int(label['y']), h))
             pt2 = (_clamp(pt1[0] + int(label['width']), w), _clamp(pt1[1] + int(label['height']), h))

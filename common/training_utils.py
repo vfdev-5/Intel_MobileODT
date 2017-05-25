@@ -1,8 +1,11 @@
 
 import os
-from glob import glob
 import numpy as np
 import cv2
+import sys
+
+if sys.version_info < (3,):
+    from itertools import izip as zip, imap as map
 
 from keras.preprocessing.image import random_rotation, random_shift, flip_axis
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
@@ -11,10 +14,10 @@ from keras import __version__ as keras_version
 
 
 # Project
-from data_utils import test_ids, type_to_index, type_1_ids, type_2_ids, type_3_ids
+from data_utils import type_to_index, type_1_ids, type_2_ids, type_3_ids
 from data_utils import additional_type_1_ids, additional_type_2_ids, additional_type_3_ids
-from data_utils import GENERATED_DATA
-from image_utils import get_image_data, imwrite
+from data_utils import GENERATED_DATA, get_id_type_list_from_annotations
+from image_utils import get_image_data
 from metrics import jaccard_index, logloss_mc
 from xy_providers import cached_image_mask_provider, cached_image_label_provider
 
@@ -41,18 +44,18 @@ def find_best_weights_file(weights_files, start_index=None, end_index=-3):
 
 
 def find_best_weights_file2(weights_files, field_name='val_loss', best_min=True):
-    
-    best_value = 1e5 if best_min else -1e5    
+
+    best_value = 1e5 if best_min else -1e5
     if best_min:
         best_value = 1e5
         comp = lambda a, b: a > b
     else:
         best_value = -1e5
         comp = lambda a, b: a < b
-        
+
     if '=' != field_name[-1]:
         field_name += '='
-   
+
     best_weights_filename = ""
     for f in weights_files:
         index = f.find(field_name)
@@ -153,31 +156,8 @@ def get_trainval_id_type_lists2(annotations, val_split=0.3):
     train_annotations = annotations[:ll]
     val_annotations = annotations[ll:]
 
-    train_id_type_list = []
-    for i, annotation in enumerate(train_annotations):
-        image_name = annotation['filename']
-        image_id = os.path.basename(image_name)[:-4]
-        splt = os.path.split(os.path.dirname(image_name))
-        if os.path.basename(splt[0]).lower() == "train":
-            image_type = splt[1]
-        elif os.path.basename(splt[0]).lower() == "additional":
-            image_type = "A" + splt[1]
-        else:
-            raise Exception("Unknown type : %s" % os.path.basename(splt[0]))
-        train_id_type_list.append((image_id, image_type))
-
-    val_id_type_list = []
-    for i, annotation in enumerate(val_annotations):
-        image_name = annotation['filename']
-        image_id = os.path.basename(image_name)[:-4]
-        splt = os.path.split(os.path.dirname(image_name))
-        if os.path.basename(splt[0]).lower() == "train":
-            image_type = splt[1]
-        elif os.path.basename(splt[0]).lower() == "additional":
-            image_type = "A" + splt[1]
-        else:
-            raise Exception("Unknown type : %s" % os.path.basename(splt[0]))
-        val_id_type_list.append((image_id, image_type))
+    train_id_type_list = get_id_type_list_from_annotations(train_annotations)
+    val_id_type_list = get_id_type_list_from_annotations(val_annotations)
 
     return train_id_type_list, val_id_type_list
 
@@ -277,6 +257,44 @@ def random_rgb_to_green(x, y):
     return out, y
 
 
+def random_more_blue(x, y, channels_first):
+
+    def more_blue(img, b=0, channels_first=False):
+        out = img.copy()
+        f1 = np.random.rand() * 0.05 + 0.6
+        f2 = np.random.rand() * 0.05 + 0.7
+        if channels_first:
+            out[2, :, :] = np.clip(img[2, :, :] * 1.15 + b, 0, 1.0)
+            out[0, :, :] = np.clip(img[0, :, :] * f1 + b, 0, 1.0)
+            out[1, :, :] = np.clip(img[1, :, :] * f2 + b, 0, 1.0)
+        else:
+            out[:, :, 2] = np.clip(img[:, :, 2] * 1.15 + b, 0, 1.0)
+            out[:, :, 0] = np.clip(img[:, :, 0] * f1 + b, 0, 1.0)
+            out[:, :, 1] = np.clip(img[:, :, 1] * f2 + b, 0, 1.0)
+        return out
+
+    return more_blue(x, b=np.random.randint(-50, 120) * 1.0/255.0, channels_first=channels_first), y
+
+
+def random_more_yellow(x, y, channels_first):
+
+    def more_yellow(img, b=0, channels_first=False):
+        out = img.copy()
+        f1 = np.random.rand() * 0.15 + 0.6
+        f2 = np.random.rand() * 0.05 + 0.15
+        if channels_first:
+            out[0, :, :] = np.clip(img[0, :, :] * 1.05 + b, 0, 1.0)
+            out[1, :, :] = np.clip(img[1, :, :] * f1 + b, 0, 1.0)
+            out[2, :, :] = np.clip(img[2, :, :] * f2 + b, 0, 1.0)
+        else:
+            out[:, :, 0] = np.clip(img[:, :, 0] * 1.05 + b, 0, 1.0)
+            out[:, :, 1] = np.clip(img[:, :, 1] * f1 + b, 0, 1.0)
+            out[:, :, 2] = np.clip(img[:, :, 2] * f2 + b, 0, 1.0)
+        return out
+
+    return more_yellow(x, b=np.random.randint(-50, 120) * 1.0/255.0, channels_first=channels_first), y
+
+
 # ###### Segmentation task #######
 
 
@@ -300,7 +318,8 @@ def segmentation_train(model,
     if not os.path.exists('weights'):
         os.mkdir('weights')
 
-    weights_filename = os.path.join("weights", save_prefix + "_{epoch:02d}-{val_loss:.4f}-{val_jaccard_index:.4f}.h5")
+    weights_filename = os.path.join("weights", save_prefix +
+                                    "_{epoch:02d}_val_loss={val_loss:.4f}_val_jaccard_index={val_jaccard_index:.4f}.h5")
     model_checkpoint = ModelCheckpoint(weights_filename, monitor='loss', save_best_only=True)
     callbacks = [model_checkpoint, ]
     if lrate_decay_f is not None:
@@ -313,21 +332,41 @@ def segmentation_train(model,
     xy_provider_verbose = 0
     xy_provider_label_type = 'trainval_label_0'
 
-    train_gen = ImageMaskGenerator(pipeline=('random_transform', random_rgb_to_green, 'standardize'),
+    if hasattr(K, 'image_data_format'):
+        channels_first = K.image_data_format() == 'channels_first'
+    elif hasattr(K, 'image_dim_ordering'):
+        channels_first = K.image_dim_ordering() == 'th'
+    else:
+        raise Exception("Failed to find backend data format")
+
+    r1 = lambda x, y: random_more_blue(x, y, channels_first)
+    r2 = lambda x, y: random_more_yellow(x, y, channels_first)
+
+    def random_blue_or_yellow(x, y):
+        r = np.random.rand()
+        if r > 0.667:
+            return r1(x, y)
+        elif 0.333 < r <= 0.667:
+            return r2(x, y)
+        else:
+            return x, y
+
+    train_gen = ImageMaskGenerator(pipeline=('random_transform', random_blue_or_yellow, 'standardize'),
                                    featurewise_center=True,
                                    featurewise_std_normalization=True,
-                                   rotation_range=90.,
-                                   width_shift_range=0.15, height_shift_range=0.15,
-                                   shear_range=3.14/6.0,
-                                   zoom_range=0.25,
-                                   channel_shift_range=0.1,
+                                   rotation_range=45.,
+                                   width_shift_range=0.1, height_shift_range=0.1,
+                                   zoom_range=[0.65, 1.2],
                                    horizontal_flip=True,
-                                   vertical_flip=True)
+                                   vertical_flip=True,
+                                   fill_mode='constant')
+
     val_gen = ImageMaskGenerator(featurewise_center=True,
                                  featurewise_std_normalization=True,
-                                 rotation_range=90.,
+                                 rotation_range=45.,
                                  horizontal_flip=True,
-                                 vertical_flip=True)
+                                 vertical_flip=True,
+                                 fill_mode='constant')
 
     print("\n-- Fit stats of train dataset")
     train_gen.fit(xy_provider(train_id_type_list,
@@ -443,6 +482,169 @@ def segmentation_validate(model,
 
 # ##### Classification ####
 
+def get_train_gen_flow(train_id_type_list,
+                       normalize_data,
+                       normalization,
+                       batch_size,
+                       option,
+                       image_size,
+                       seed,
+                       save_prefix,
+                       xy_provider_cache,
+                       verbose):
+
+    xy_provider = cached_image_label_provider
+    xy_provider_verbose = 0
+
+    if hasattr(K, 'image_data_format'):
+        channels_first = K.image_data_format() == 'channels_first'
+    elif hasattr(K, 'image_dim_ordering'):
+        channels_first = K.image_dim_ordering() == 'th'
+    else:
+        raise Exception("Failed to find backend data format")
+
+    r1 = lambda x: random_more_blue(x, None, channels_first)[0]
+    r2 = lambda x: random_more_yellow(x, None, channels_first)[0]
+
+    def random_blue_or_yellow(x):
+        r = np.random.rand()
+        if r > 0.667:
+            return r1(x)
+        elif 0.333 < r <= 0.667:
+            return r2(x)
+        else:
+            return x
+
+    train_gen = ImageDataGenerator(pipeline=('random_transform', random_blue_or_yellow, 'standardize'),
+                                   featurewise_center=normalize_data,
+                                   featurewise_std_normalization=normalize_data,
+                                   rotation_range=45.,
+                                   width_shift_range=0.1, height_shift_range=0.1,
+                                   zoom_range=[0.65, 1.2],
+                                   horizontal_flip=True,
+                                   vertical_flip=True,
+                                   fill_mode='constant')
+
+    if normalize_data:
+        if normalization == '':
+            print("\n-- Fit stats of train dataset")
+            train_gen.fit(xy_provider(train_id_type_list,
+                                      image_size=image_size,
+                                      option=option,
+                                      test_mode=True,
+                                      channels_first=channels_first,
+                                      cache=xy_provider_cache),
+                          len(train_id_type_list),
+                          augment=True,
+                          seed=seed,
+                          save_to_dir=GENERATED_DATA,
+                          save_prefix=save_prefix + '_' + option,
+                          batch_size=4,
+                          verbose=verbose)
+        elif normalization == 'inception' or normalization == 'xception':
+            # Preprocessing of Xception: keras/applications/xception.py
+            print("Image normalization: ", normalization)
+            train_gen.mean = 0.5
+            train_gen.std = 0.5
+        elif normalization == 'resnet' or normalization == 'vgg':
+            print("Image normalization: ", normalization)
+            train_gen.std = 1.0 / 255.0  # Rescale to [0.0, 255.0]
+            m = np.array([123.68, 116.779, 103.939]) / 255.0  # RGB
+            if channels_first:
+                m = m[:, None, None]
+            else:
+                m = m[None, None, :]
+            train_gen.mean = m
+
+    train_flow = train_gen.flow(xy_provider(train_id_type_list,
+                                            image_size=image_size,
+                                            option=option,
+                                            seed=seed,
+                                            channels_first=channels_first,
+                                            cache=xy_provider_cache,
+                                            verbose=xy_provider_verbose),
+                                # Ensure that all batches have the same size
+                                (len(train_id_type_list) // batch_size) * batch_size,
+                                seed=seed,
+                                batch_size=batch_size)
+
+    return train_gen, train_flow
+
+
+def get_val_gen_flow(val_id_type_list,
+                     normalize_data,
+                     normalization,
+                     save_prefix,
+                     batch_size,
+                     image_size,
+                     option,
+                     seed,
+                     xy_provider_cache,
+                     test_mode=False):
+
+    xy_provider = cached_image_label_provider
+    xy_provider_verbose = 0
+
+    if hasattr(K, 'image_data_format'):
+        channels_first = K.image_data_format() == 'channels_first'
+    elif hasattr(K, 'image_dim_ordering'):
+        channels_first = K.image_dim_ordering() == 'th'
+    else:
+        raise Exception("Failed to find backend data format")
+
+    val_gen = ImageDataGenerator(featurewise_center=normalize_data,
+                                 featurewise_std_normalization=normalize_data,
+                                 rotation_range=15.,
+                                 horizontal_flip=True,
+                                 vertical_flip=True,
+                                 fill_mode='constant')
+
+    # if normalize_data and train_gen is not None:
+    #     val_gen.mean = train_gen.mean
+    #     val_gen.std = train_gen.std
+    #     val_gen.principal_components = train_gen.principal_components
+
+    if normalize_data:
+        if normalization == '':
+            assert len(save_prefix) > 0, "WTF"
+            # Load mean, std, principal_components if file exists
+            filename = os.path.join(GENERATED_DATA, save_prefix + "_" + option + "_stats.npz")
+            assert os.path.exists(filename), "WTF"
+            print("Load existing file: %s" % filename)
+            npzfile = np.load(filename)
+            val_gen.mean = npzfile['mean']
+            val_gen.std = npzfile['std']
+        elif normalization == 'inception' or normalization == 'xception':
+            # Preprocessing of Xception: keras/applications/xception.py
+            print("Image normalization: ", normalization)
+            val_gen.mean = 0.5
+            val_gen.std = 0.5
+        elif normalization == 'resnet' or normalization == 'vgg':
+            print("Image normalization: ", normalization)
+            val_gen.std = 1.0 / 255.0  # Rescale to [0.0, 255.0]
+            m = np.array([123.68, 116.779, 103.939]) / 255.0 # RGB
+            if channels_first:
+                m = m[:, None, None]
+            else:
+                m = m[None, None, :]
+            val_gen.mean = m
+
+    val_flow = val_gen.flow(xy_provider(val_id_type_list,
+                                        image_size=image_size,
+                                        option=option,
+                                        seed=seed,
+                                        test_mode=test_mode,
+                                        channels_first=channels_first,
+                                        cache=xy_provider_cache,
+                                        verbose=xy_provider_verbose),
+                            # Ensure that all batches have the same size
+                            (len(val_id_type_list) // batch_size) * batch_size,
+                            seed=seed,
+                            batch_size=batch_size)
+
+    return val_gen, val_flow
+
+
 def classification_train(model,
                          train_id_type_list,
                          val_id_type_list,
@@ -471,101 +673,82 @@ def classification_train(model,
                                     "_{epoch:02d}_val_loss={val_loss:.4f}_" +
                                     "val_acc={val_acc:.4f}_val_precision={val_precision:.4f}_" +
                                     "val_recall={val_recall:.4f}.h5")
-    model_checkpoint = ModelCheckpoint(weights_filename, monitor='val_loss', save_best_only=True)
+    model_checkpoint = ModelCheckpoint(weights_filename, monitor='val_loss',
+                                       save_best_only=True, save_weights_only=True)
     callbacks = [model_checkpoint, ]
     if lrate_decay_f is not None:
         lrate = LearningRateScheduler(lrate_decay_f)
         callbacks.append(lrate)
 
     print("\n-- Training parameters: %i, %i, %i, %i" % (batch_size, nb_epochs, samples_per_epoch, nb_val_samples))
-
-    xy_provider = cached_image_label_provider
-    xy_provider_verbose = 0
-
-    train_gen = ImageDataGenerator(pipeline=('random_transform', random_rgb_to_green_generic, 'standardize'),
-                                   featurewise_center=normalize_data,
-                                   featurewise_std_normalization=normalize_data,
-                                   rotation_range=90.,
-                                   width_shift_range=0.25, height_shift_range=0.25,
-                                   # shear_range=3.14/6.0,
-                                   zoom_range=0.35,
-                                   # channel_shift_range=0.1,
-                                   horizontal_flip=True,
-                                   vertical_flip=True,
-                                   fill_mode='constant')
-    val_gen = ImageDataGenerator(rotation_range=15.,
-                                 featurewise_center=normalize_data,
-                                 featurewise_std_normalization=normalize_data,
-                                 horizontal_flip=True,
-                                 vertical_flip=True,
-                                 fill_mode='constant')
-
-    if hasattr(K, 'image_data_format'):
-        channels_first = K.image_data_format() == 'channels_first'
-    elif hasattr(K, 'image_dim_ordering'):
-        channels_first = K.image_dim_ordering() == 'th'
-    else:
-        raise Exception("Failed to find backend data format")
-
-    if normalize_data:
-        if normalization == '':
-            print("\n-- Fit stats of train dataset")
-            train_gen.fit(xy_provider(train_id_type_list,
-                                      image_size=image_size,
-                                      option=option,
-                                      test_mode=True,
-                                      channels_first=channels_first,
-                                      cache=xy_provider_cache),
-                          len(train_id_type_list),
-                          augment=True,
-                          seed=seed,
-                          save_to_dir=GENERATED_DATA,
-                          save_prefix=save_prefix,
-                          batch_size=4,
-                          verbose=verbose)
-        elif normalization == 'inception' or normalization == 'xception':
-            # Preprocessing of Xception: keras/applications/xception.py
-            print("Image normalization: ", normalization)
-            train_gen.mean = 0.5
-            train_gen.std = 0.5
-        elif normalization == 'resnet' or normalization == 'vgg':
-            print("Image normalization: ", normalization)
-            train_gen.std = 1.0 / 255.0  # Rescale to [0.0, 255.0]
-            m = np.array([123.68, 116.779, 103.939]) / 255.0 # RGB
-            if channels_first:                
-                m = m[:, None, None]
-            else:
-                m = m[None, None, :]
-            train_gen.mean = m
-                                          
-    val_gen.mean = train_gen.mean
-    val_gen.std = train_gen.std
-    val_gen.principal_components = train_gen.principal_components
-
     print("\n-- Fit model")
     try:
+        if option == 'cervix/os':
+            train_gen1, train_flow1 = get_train_gen_flow(train_id_type_list=train_id_type_list,
+                                                         normalize_data=normalize_data,
+                                                         normalization=normalization,
+                                                         batch_size=batch_size,
+                                                         seed=seed,
+                                                         image_size=image_size,
+                                                         option='cervix',
+                                                         save_prefix=save_prefix,
+                                                         xy_provider_cache=xy_provider_cache,
+                                                         verbose=verbose)
 
-        train_flow = train_gen.flow(xy_provider(train_id_type_list,
-                                                image_size=image_size,
-                                                option=option,
-                                                channels_first=channels_first,
-                                                cache=xy_provider_cache,
-                                                verbose=xy_provider_verbose),
-                                    # Ensure that all batches have the same size
-                                    (len(train_id_type_list) // batch_size) * batch_size,
-                                    seed=seed,
-                                    batch_size=batch_size)
+            val_gen1, val_flow1 = get_val_gen_flow(val_id_type_list=val_id_type_list,
+                                                   normalization=normalization,
+                                                   save_prefix=save_prefix,
+                                                   normalize_data=normalize_data,
+                                                   batch_size=batch_size,
+                                                   seed=seed,
+                                                   image_size=image_size,
+                                                   option='cervix',
+                                                   xy_provider_cache=xy_provider_cache)
 
-        val_flow = val_gen.flow(xy_provider(val_id_type_list,
-                                            image_size=image_size,
-                                            option=option,
-                                            channels_first=channels_first,
-                                            cache=xy_provider_cache,
-                                            verbose=xy_provider_verbose),
-                                # Ensure that all batches have the same size
-                                (len(val_id_type_list) // batch_size) * batch_size,
-                                seed=seed,
-                                batch_size=batch_size)
+            train_gen2, train_flow2 = get_train_gen_flow(train_id_type_list=train_id_type_list,
+                                                         normalize_data=normalize_data,
+                                                         normalization=normalization,
+                                                         batch_size=batch_size,
+                                                         seed=seed,
+                                                         image_size=image_size,
+                                                         option='os',
+                                                         save_prefix=save_prefix,
+                                                         xy_provider_cache=xy_provider_cache,
+                                                         verbose=verbose)
+
+            val_gen2, val_flow2 = get_val_gen_flow(val_id_type_list=val_id_type_list,
+                                                   normalization=normalization,
+                                                   save_prefix=save_prefix,
+                                                   normalize_data=normalize_data,
+                                                   batch_size=batch_size,
+                                                   seed=seed,
+                                                   image_size=image_size,
+                                                   option='os',
+                                                   xy_provider_cache=xy_provider_cache)
+
+            train_flow = map(lambda t: ([t[0][0], t[1][0]], t[0][1]), zip(train_flow1, train_flow2))
+            val_flow = map(lambda t: ([t[0][0], t[1][0]], t[0][1]), zip(val_flow1, val_flow2))
+        else:
+            train_gen, train_flow = get_train_gen_flow(train_id_type_list=train_id_type_list,
+                                                       normalize_data=normalize_data,
+                                                       normalization=normalization,
+                                                       batch_size=batch_size,
+                                                       seed=seed,
+                                                       image_size=image_size,
+                                                       option=option,
+                                                       save_prefix=save_prefix,
+                                                       xy_provider_cache=xy_provider_cache,
+                                                       verbose=verbose)
+
+            val_gen, val_flow = get_val_gen_flow(val_id_type_list=val_id_type_list,
+                                                 normalization=normalization,
+                                                 save_prefix=save_prefix,
+                                                 normalize_data=normalize_data,
+                                                 batch_size=batch_size,
+                                                 seed=seed,
+                                                 image_size=image_size,
+                                                 option=option,
+                                                 xy_provider_cache=xy_provider_cache)
 
         # New or old Keras API
         if int(keras_version[0]) == 2:
@@ -612,59 +795,58 @@ def classification_validate(model,
                             image_size=(224, 224),
                             save_prefix="",
                             batch_size=16,
+                            seed=None,
                             xy_provider_cache=None):
 
-    
-    if hasattr(K, 'image_data_format'):
-        channels_first = K.image_data_format() == 'channels_first'
-    elif hasattr(K, 'image_dim_ordering'):
-        channels_first = K.image_dim_ordering() == 'th'
+    if option == 'cervix/os':
+        val_gen1, val_flow1 = get_val_gen_flow(val_id_type_list=val_id_type_list,
+                                               normalization=normalization,
+                                               save_prefix=save_prefix,
+                                               normalize_data=normalize_data,
+                                               batch_size=batch_size,
+                                               seed=seed,
+                                               image_size=image_size,
+                                               option='cervix',
+                                               test_mode=True,
+                                               xy_provider_cache=xy_provider_cache)
+
+        val_gen2, val_flow2 = get_val_gen_flow(val_id_type_list=val_id_type_list,
+                                               normalization=normalization,
+                                               save_prefix=save_prefix,
+                                               normalize_data=normalize_data,
+                                               batch_size=batch_size,
+                                               seed=seed,
+                                               image_size=image_size,
+                                               option='os',
+                                               test_mode=True,
+                                               xy_provider_cache=xy_provider_cache)
+
+        val_flow = map(lambda t: ([t[0][0], t[1][0]], t[0][1], t[0][2]), zip(val_flow1, val_flow2))
     else:
-        raise Exception("Failed to find backend data format")
+        val_gen, val_flow = get_val_gen_flow(val_id_type_list=val_id_type_list,
+                                             normalization=normalization,
+                                             save_prefix=save_prefix,
+                                             normalize_data=normalize_data,
+                                             batch_size=batch_size,
+                                             seed=seed,
+                                             image_size=image_size,
+                                             option=option,
+                                             test_mode=True,
+                                             xy_provider_cache=xy_provider_cache)
 
-    xy_provider = cached_image_label_provider
-
-    val_gen = ImageDataGenerator(featurewise_center=normalize_data,
-                                 featurewise_std_normalization=normalize_data)
-
-    if normalize_data:
-        if normalization == '':
-            assert len(save_prefix) > 0, "WTF"
-            # Load mean, std, principal_components if file exists
-            filename = os.path.join(GENERATED_DATA, save_prefix + "_stats.npz")
-            assert os.path.exists(filename), "WTF"
-            print("Load existing file: %s" % filename)
-            npzfile = np.load(filename)
-            val_gen.mean = npzfile['mean']
-            val_gen.std = npzfile['std']
-        elif normalization == 'inception' or normalization == 'xception':
-            # Preprocessing of Xception: keras/applications/xception.py
-            print("Image normalization: ", normalization)
-            val_gen.mean = 0.5
-            val_gen.std = 0.5
-        elif normalization == 'resnet' or normalization == 'vgg':
-            print("Image normalization: ", normalization)
-            val_gen.std = 1.0 / 255.0  # Rescale to [0.0, 255.0]
-            m = np.array([123.68, 116.779, 103.939]) / 255.0 # RGB
-            if channels_first:                
-                m = m[:, None, None]
-            else:
-                m = m[None, None, :]
-            val_gen.mean = m   
-            
-    flow = val_gen.flow(xy_provider(val_id_type_list,
-                                    image_size=image_size,
-                                    option=option,
-                                    channels_first=channels_first,
-                                    cache=xy_provider_cache,
-                                    test_mode=True),
-                        # Ensure that all batches have the same size
-                        len(val_id_type_list),
-                        batch_size=batch_size)
+    # flow = val_gen.flow(xy_provider(val_id_type_list,
+    #                                 image_size=image_size,
+    #                                 option=option,
+    #                                 channels_first=channels_first,
+    #                                 cache=xy_provider_cache,
+    #                                 test_mode=True),
+    #                     # Ensure that all batches have the same size
+    #                     len(val_id_type_list),
+    #                     batch_size=batch_size)
 
     total_loss = 0.0
     total_counter = 0
-    for x, y_true, info in flow:
+    for x, y_true, info in val_flow:
         s = y_true.shape[0]
         total_counter += s
         y_pred = model.predict(x)
@@ -677,6 +859,7 @@ def classification_validate(model,
 
     total_loss *= 1.0 / total_counter
     print("Total loss : ", total_loss)
+    return total_loss
 
 
 # ###### OLD #####
