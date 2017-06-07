@@ -4,7 +4,7 @@ import sys
 
 
 # On Colfax :
-def setup_keras_122():
+def setup_keras_122(check_mkl=False):
     if os.path.exists("/home/u2459/keras-1.2.2"):
         keras_lib_path = "/home/u2459/keras-1.2.2/build/lib"
         if not keras_lib_path in sys.path:
@@ -12,4 +12,5 @@ def setup_keras_122():
         from keras import __version__
         print "Keras version: ", __version__
         import theano
-        print "mkl_available: ", theano.sandbox.mkl.mkl_available()
+        if check_mkl:
+            print "mkl_available: ", theano.sandbox.mkl.mkl_available()

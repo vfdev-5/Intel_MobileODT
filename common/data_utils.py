@@ -7,12 +7,8 @@ import numpy as np
 
 project_common_path = os.path.dirname(__file__)
 
-if 'c001' in platform.node():
-    DATA_PATH = "/data/kaggle"
-    INPUT_PATH = os.path.abspath(os.path.join(project_common_path, "..", "input"))
-else:
-    DATA_PATH = os.path.abspath(os.path.join(project_common_path, "..", "input"))
-    INPUT_PATH = DATA_PATH
+DATA_PATH = os.path.abspath("../input")
+INPUT_PATH = DATA_PATH
 
 
 TRAIN_DATA = os.path.join(DATA_PATH, "train")
