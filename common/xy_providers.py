@@ -1,9 +1,11 @@
 import os
+import pickle
+
 
 import numpy as np
 import cv2
 
-from image_utils import get_image_data, get_image_bbox, get_os_image, get_cervix_image
+from image_utils import get_image_data, get_os_image, get_cervix_image
 from data_utils import type_to_index
 
 
@@ -104,10 +106,21 @@ class DataCache(object):
 
     def remove(self, data_id):
         self.ids_queue.remove(data_id)
-        self.cache.pop(data_id)        
-        
+        self.cache.pop(data_id)
+
     def __contains__(self, key):
         return key in self.cache and key in self.ids_queue
+
+
+def save_data_cache(cache, filename):
+    assert not os.path.exists(filename), "Output file already exists"
+    with open(filename, 'wb') as f:
+        pickle.dump(cache, f, pickle.HIGHEST_PROTOCOL)
+
+
+def load_data_cache(filename):
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
 
 
 def cached_image_mask_provider(image_id_type_list,
@@ -172,41 +185,51 @@ def cached_image_mask_provider(image_id_type_list,
         counter += 1
 
 
-def cached_image_provider(image_id_type_list,
-                          image_size=(224, 224),
-                          channels_first=True,
-                          option="",
-                          cache=None,
-                          verbose=0):
-    if cache is None:
-        cache = DataCache(n_samples=500)
-
-    for i, (image_id, image_type) in enumerate(image_id_type_list):
-        if verbose > 0:
-            print("Image id/type:", image_id, image_type, "| counter=", i)
-
-        key = (image_id, image_type)
-        if key in cache:
-            img, _ = cache.get(key)
-        else:
-            if option == 'cervix':
-                img = get_cervix_image(image_id, image_type)
-            elif option == 'os':
-                img = get_os_image(image_id, image_type)
-            else:
-                img = get_image_data(image_id, image_type)
-
-            if img.dtype.kind is not 'u':
-                if verbose > 0:
-                    print("Image is corrupted. Id/Type:", image_id, image_type)
-                continue
-            img = cv2.resize(img, dsize=image_size[::-1])
-            if channels_first:
-                img = img.transpose([2, 0, 1])
-            img = img.astype(np.float32) / 255.0
-            cache.put(key, (img, None))
-
-        yield img, None, (image_id, image_type)
+# def cached_image_provider(image_id_type_list,
+#                           image_size=(224, 224),
+#                           channels_first=True,
+#                           option="",
+#                           cache=None,
+#                           verbose=0):
+#     if cache is None:
+#         cache = DataCache(n_samples=500)
+#
+#     for i, (image_id, image_type) in enumerate(image_id_type_list):
+#         if verbose > 0:
+#             print("Image id/type:", image_id, image_type, "| counter=", i)
+#
+#         key = (image_id, image_type, option)
+#         if key in cache:
+#             img, _ = cache.get(key)
+#
+#             if channels_first:
+#                 if img.shape[1:] != image_size[::-1]:
+#                     img = img.transpose([1, 2, 0])
+#                     img = cv2.resize(img, dsize=image_size[::-1])
+#                     img = img.transpose([2, 0, 1])
+#             else:
+#                 if img.shape[:2] != image_size[::-1]:
+#                     img = cv2.resize(img, dsize=image_size[::-1])
+#
+#         else:
+#             if option == 'cervix':
+#                 img = get_cervix_image(image_id, image_type)
+#             elif option == 'os':
+#                 img = get_os_image(image_id, image_type)
+#             else:
+#                 img = get_image_data(image_id, image_type)
+#
+#             if img.dtype.kind is not 'u':
+#                 if verbose > 0:
+#                     print("Image is corrupted. Id/Type:", image_id, image_type)
+#                 continue
+#             img = cv2.resize(img, dsize=image_size[::-1])
+#             if channels_first:
+#                 img = img.transpose([2, 0, 1])
+#             img = img.astype(np.float32) / 255.0
+#             cache.put(key, (img, None))
+#
+#         yield img, None, (image_id, image_type)
 
 
 def cached_image_label_provider(image_id_type_list,
@@ -216,6 +239,7 @@ def cached_image_label_provider(image_id_type_list,
                                 test_mode=False,
                                 cache=None,
                                 seed=None,
+                                with_labels=True,
                                 verbose=0):
 
     if seed is not None:
@@ -244,7 +268,7 @@ def cached_image_label_provider(image_id_type_list,
                 if verbose > 0:
                     print("-- Load from RAM")
                 img, label = cache.get(key)
-                
+
                 if channels_first:
                     if img.shape[1:] != image_size[::-1]:
                         img = img.transpose([1, 2, 0])
@@ -270,8 +294,11 @@ def cached_image_label_provider(image_id_type_list,
                     img = img.transpose([2, 0, 1])
                 img = img.astype(np.float32) / 255.0
 
-                label = np.array([0, 0, 0], dtype=np.uint8)
-                label[type_to_index[image_type]] = 1
+                if with_labels:
+                    label = np.array([0, 0, 0], dtype=np.uint8)
+                    label[type_to_index[image_type]] = 1
+                else:
+                    label = None
                 # fill the cache only at first time:
                 if counter == 0:
                     cache.put(key, (img, label))

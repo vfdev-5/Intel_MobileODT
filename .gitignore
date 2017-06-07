@@ -13,6 +13,8 @@ train.txt*
 val.txt*
 labels.txt*
 *.gz
+/tmp/*.npz
+/notebooks/weights/*.log
 
 ## Linux backup files
 *~

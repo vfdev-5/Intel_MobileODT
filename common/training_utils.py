@@ -3,12 +3,13 @@ import os
 import numpy as np
 import cv2
 import sys
+from datetime import datetime
 
 if sys.version_info < (3,):
     from itertools import izip as zip, imap as map
 
 from keras.preprocessing.image import random_rotation, random_shift, flip_axis
-from keras.callbacks import ModelCheckpoint, LearningRateScheduler
+from keras.callbacks import ModelCheckpoint, LearningRateScheduler, CSVLogger
 from keras import backend as K
 from keras import __version__ as keras_version
 
@@ -523,7 +524,7 @@ def get_train_gen_flow(train_id_type_list,
                                    zoom_range=[0.65, 1.2],
                                    horizontal_flip=True,
                                    vertical_flip=True,
-                                   fill_mode='constant')
+                                   fill_mode='reflect')
 
     if normalize_data:
         if normalization == '':
@@ -594,15 +595,10 @@ def get_val_gen_flow(val_id_type_list,
 
     val_gen = ImageDataGenerator(featurewise_center=normalize_data,
                                  featurewise_std_normalization=normalize_data,
-                                 rotation_range=15.,
+                                 rotation_range=45.,
                                  horizontal_flip=True,
                                  vertical_flip=True,
-                                 fill_mode='constant')
-
-    # if normalize_data and train_gen is not None:
-    #     val_gen.mean = train_gen.mean
-    #     val_gen.std = train_gen.std
-    #     val_gen.principal_components = train_gen.principal_components
+                                 fill_mode='reflect')
 
     if normalize_data:
         if normalization == '':
@@ -671,11 +667,13 @@ def classification_train(model,
 
     weights_filename = os.path.join("weights", save_prefix +
                                     "_{epoch:02d}_val_loss={val_loss:.4f}_" +
-                                    "val_acc={val_acc:.4f}_val_precision={val_precision:.4f}_" +
-                                    "val_recall={val_recall:.4f}.h5")
+                                    "val_cat_crossentropy={val_categorical_crossentropy:.4f}_" +
+                                    "val_cat_accuracy={val_categorical_accuracy:.4f}.h5")
     model_checkpoint = ModelCheckpoint(weights_filename, monitor='val_loss',
                                        save_best_only=True, save_weights_only=True)
-    callbacks = [model_checkpoint, ]
+    now = datetime.now()
+    csv_logger = CSVLogger('weights/training_%s_%s.log' % (save_prefix, str(now.strftime("%Y-%m-%d-%H-%M"))))
+    callbacks = [model_checkpoint, csv_logger, ]
     if lrate_decay_f is not None:
         lrate = LearningRateScheduler(lrate_decay_f)
         callbacks.append(lrate)
@@ -710,7 +708,7 @@ def classification_train(model,
                                                          normalization=normalization,
                                                          batch_size=batch_size,
                                                          seed=seed,
-                                                         image_size=image_size,
+                                                         image_size=tuple([int(s/2) for s in image_size]),
                                                          option='os',
                                                          save_prefix=save_prefix,
                                                          xy_provider_cache=xy_provider_cache,
@@ -722,7 +720,7 @@ def classification_train(model,
                                                    normalize_data=normalize_data,
                                                    batch_size=batch_size,
                                                    seed=seed,
-                                                   image_size=image_size,
+                                                   image_size=tuple([int(s/2) for s in image_size]),
                                                    option='os',
                                                    xy_provider_cache=xy_provider_cache)
 
@@ -771,15 +769,24 @@ def classification_train(model,
                                           class_weight=class_weight,
                                           verbose=verbose)
         # save the last
+        #val_loss = history.history['val_loss'][-1]
+        #val_acc = history.history['val_acc'][-1]
+        #val_recall = history.history['val_recall'][-1]
+        #val_precision = history.history['val_precision'][-1]
+        #weights_filename = weights_filename.format(epoch=nb_epochs,
+        #                                           val_loss=val_loss,
+        #                                           val_acc=val_acc,
+        #                                           val_precision=val_precision,
+        #                                           val_recall=val_recall)
+        
         val_loss = history.history['val_loss'][-1]
-        val_acc = history.history['val_acc'][-1]
-        val_recall = history.history['val_recall'][-1]
-        val_precision = history.history['val_precision'][-1]
+        val_cat_crossentropy = history.history['val_categorical_crossentropy'][-1]
+        val_cat_accuracy = history.history['val_categorical_accuracy'][-1]
         weights_filename = weights_filename.format(epoch=nb_epochs,
                                                    val_loss=val_loss,
-                                                   val_acc=val_acc,
-                                                   val_precision=val_precision,
-                                                   val_recall=val_recall)
+                                                   val_categorical_crossentropy=val_cat_crossentropy,
+                                                   val_categorical_accuracy=val_cat_accuracy)
+
         model.save_weights(weights_filename)
         return history
 
@@ -796,7 +803,8 @@ def classification_validate(model,
                             save_prefix="",
                             batch_size=16,
                             seed=None,
-                            xy_provider_cache=None):
+                            xy_provider_cache=None,
+                            verbose=1):
 
     if option == 'cervix/os':
         val_gen1, val_flow1 = get_val_gen_flow(val_id_type_list=val_id_type_list,
@@ -816,7 +824,7 @@ def classification_validate(model,
                                                normalize_data=normalize_data,
                                                batch_size=batch_size,
                                                seed=seed,
-                                               image_size=image_size,
+                                               image_size=tuple([int(s/2) for s in image_size]),
                                                option='os',
                                                test_mode=True,
                                                xy_provider_cache=xy_provider_cache)
@@ -834,16 +842,6 @@ def classification_validate(model,
                                              test_mode=True,
                                              xy_provider_cache=xy_provider_cache)
 
-    # flow = val_gen.flow(xy_provider(val_id_type_list,
-    #                                 image_size=image_size,
-    #                                 option=option,
-    #                                 channels_first=channels_first,
-    #                                 cache=xy_provider_cache,
-    #                                 test_mode=True),
-    #                     # Ensure that all batches have the same size
-    #                     len(val_id_type_list),
-    #                     batch_size=batch_size)
-
     total_loss = 0.0
     total_counter = 0
     for x, y_true, info in val_flow:
@@ -852,13 +850,15 @@ def classification_validate(model,
         y_pred = model.predict(x)
         loss = logloss_mc(y_true, y_pred)
         total_loss += s * loss
-        print("--", total_counter, "batch loss : ", loss, " | info:", info)
+        if verbose > 1:
+            print("--", total_counter, "batch loss : ", loss, " | info:", info)
 
     if total_counter == 0:
         total_counter += 1
 
     total_loss *= 1.0 / total_counter
-    print("Total loss : ", total_loss)
+    if verbose > 0:
+        print("Total loss : ", total_loss)
     return total_loss
 
 
