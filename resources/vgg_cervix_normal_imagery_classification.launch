@@ -1,0 +1,3 @@
+#PBS -l nodes=1:knl7210:ram96gb -N resnet_16_classification -d /home/u2459/Intel_MobileODT/notebooks -e /home/u2459/Intel_MobileODT/resources/log.err -o /home/u2459/Intel_MobileODT/resources/log.out
+
+python /home/u2459/Intel_MobileODT/scripts/vgg_cervix_normal_imagery_classification_with_keras.py

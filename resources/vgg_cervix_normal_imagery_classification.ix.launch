@@ -1,0 +1,1 @@
+#PBS -l nodes=1:knl7210:ram96gb -N vgg_classification -V -I -x -d /home/u2459/Intel_MobileODT/notebooks python /home/u2459/Intel_MobileODT/scripts/vgg_cervix_normal_imagery_classification_with_keras.py
