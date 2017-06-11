@@ -15,7 +15,10 @@ from keras.applications.inception_v3 import InceptionV3
 from keras.applications.xception import Xception
 from keras.optimizers import Adam, Adadelta, SGD
 
-from kfs.optimizers import NadamAccum
+try:
+    from kfs.optimizers import NadamAccum
+except:
+    print("No Keras for Science module")
 
 
 vgg_mean_th = np.array([123.68, 116.779, 103.939], dtype=np.float32).reshape((3, 1, 1))
@@ -550,24 +553,25 @@ def get_mixed_cnn3(optimizer='', lr=0.01, accum_iters=8):
     # Shape (None, 50, 50, 704)
 
     # Block 3
-    x = Convolution2D(704, (1, 1), activation='relu', padding='same', name='block3_conv1')(x)
+    x = Convolution2D(704, (1, 1), activation='relu', padding='same', name='block3_conv2')(x)
+    x = Convolution2D(512, (1, 1), activation='relu', padding='same', name='block3_conv3')(x)
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
 
     # Block 4
-    x = Convolution2D(512, (1, 1), activation='relu', padding='same', name='block4_conv2')(x)
+    x = Convolution2D(512, (1, 1), activation='relu', padding='same', name='block4_conv1')(x)
+    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block4_conv3')(x)
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
 
     # Block 5
     x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block5_conv1')(x)
     x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block5_conv2')(x)
+    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block5_conv3')(x)
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(x)
 
     # Classification block
     x = Flatten(name='flatten')(x)
-    x = Dense(128, activation='relu', name='fc1')(x)
-    x = Dropout(0.5)(x)
-    x = Dense(128, activation='relu', name='fc2')(x)
-    x = Dropout(0.5)(x)
+    x = Dense(256, activation='relu', name='fc1')(x)
+    x = Dense(256, activation='relu', name='fc2')(x)
     outputs = Dense(n_classes, activation='softmax', name='predictions')(x)
 
     if optimizer == 'adadelta':
