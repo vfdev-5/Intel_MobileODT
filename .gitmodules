@@ -1,0 +1,3 @@
+[submodule "KerasSqueezeNet"]
+	path = common/KerasSqueezeNet
+	url = https://github.com/vfdev-5/keras-squeezenet
