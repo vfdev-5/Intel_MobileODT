@@ -593,6 +593,132 @@ def get_mixed_cnn3(optimizer='', lr=0.01, accum_iters=8):
     return model
 
 
+def get_mixed_cnn4(optimizer='', lr=0.01, accum_iters=8):
+    """
+        Input
+            -> { VGG16(b1,b2,b3); VGG19(b1,b2,b3); ResNet50(c,b2,b3) }
+            ->
+    """
+    if K.image_data_format() == 'channels_first':
+        channels_axis = 1
+        input_shape = (3, 224, 224)
+        vgg_preprocess = vgg_preprocess_th
+    else:
+        channels_axis = -1
+        input_shape = (224, 224, 3)
+        vgg_preprocess = vgg_preprocess_tf
+
+    n_classes = 3
+
+    inputs = Input(input_shape, name='input')
+    x = inputs
+
+    # Image inversion:
+    x = Lambda(x_inversion1, name='input_inversion')(x)
+
+    x1_in = x
+    x2_in = x
+    x3_in = x
+    x4_in = x
+
+    # Preprocess for VGG
+    # Subtract vgg mean and rgb -> bgr
+    x1_in = Lambda(vgg_preprocess,
+                   input_shape=input_shape,
+                   output_shape=input_shape,
+                   name='preprocess')(x1_in)
+
+    # Preprocess for ResNet
+    # Subtract vgg mean and rgb -> bgr
+    x2_in = Lambda(vgg_preprocess,
+                   input_shape=input_shape,
+                   output_shape=input_shape,
+                   name='preprocess')(x2_in)
+
+    # Preprocess for InceptionV3
+    x3_in = Lambda(incv3_preprocess,
+                   input_shape=input_shape,
+                   output_shape=input_shape,
+                   name='preprocess')(x3_in)
+
+    vgg19 = VGG19(input_tensor=x1_in, weights='imagenet')
+    _rename_model(vgg19, prefix='vgg19_')
+    _set_trainable_model(vgg19, value=False)
+    l = vgg19.get_layer(name='vgg19_block2_pool')
+    l.name = 'vgg19_output'
+    x1_out = l.output
+    # x1_out.shape = (None, 56, 56, 128)
+
+    # Add zero padding to obtain target output layer of size 56 x 56
+    x2_in = ZeroPadding2D(padding=(2, 2))(x2_in)
+    resnet = ResNet50(input_tensor=x2_in, weights='imagenet')
+    _rename_model(resnet, prefix='resnet_')
+    _set_trainable_model(resnet, value=False)
+    l = resnet.get_layer(index=37)
+    l.name = 'resnet_output'
+    x2_out = l.output
+    # x2_out.shape = (None, 56, 56, 256)
+
+    # Add zero padding to obtain target output layer of size 56 x 56
+    x3_in = ZeroPadding2D(padding=(8, 8))(x3_in)
+    incv3 = InceptionV3(input_tensor=x3_in, weights='imagenet')
+    _rename_model(incv3, prefix='incv3_')
+    _set_trainable_model(incv3, value=False)
+    l = incv3.get_layer(index=17)
+    l.name = 'incv3_output'
+    x3_out = l.output
+    # x3_out.shape = (None, 56, 56, 192)
+
+    # Crop boundaries :
+    x1_out = Cropping2D(cropping=(3, 3), name="vgg19_output_crop")(x1_out)
+    x2_out = Cropping2D(cropping=(3, 3), name="resnet_output_crop")(x2_out)
+    x3_out = Cropping2D(cropping=(3, 3), name="incv3_output_crop")(x3_out)
+
+    # Outputs have various ranges need to normalize it
+    x1_out = BatchNormalization(axis=channels_axis, name="vgg19_output_bn")(x1_out)
+    x = Concatenate(axis=channels_axis, name='concat_mix')([x1_out, x2_out, x3_out])
+    # Shape (None, 50, 50, 576)
+
+    # Block 3
+    x = Convolution2D(576, (1, 1), activation='relu', padding='same', name='block3_conv1')(x)
+    x = Convolution2D(512, (1, 1), activation='relu', padding='same', name='block3_conv2')(x)
+    x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
+
+    # Block 4
+    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block4_conv1')(x)
+    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block4_conv2')(x)
+    x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
+
+    # Block 5
+    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block5_conv1')(x)
+    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block5_conv2')(x)
+    x = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(x)
+
+    # Classification block
+    x = Flatten(name='flatten')(x)
+    x = Dense(256, activation='relu', name='fc1')(x)
+    x = Dense(256, activation='relu', name='fc2')(x)
+    outputs = Dense(n_classes, activation='softmax', name='predictions')(x)
+
+    if optimizer == 'adadelta':
+        opt = Adadelta(lr=lr)
+    elif optimizer == 'adam':
+        opt = Adam(lr=lr)
+    elif optimizer == 'sgd':
+        opt = SGD(lr=lr, momentum=0.9, decay=0.00001, nesterov=True)
+    elif optimizer == 'nadam_accum':
+        opt = NadamAccum(lr=lr, accum_iters=accum_iters)
+    else:
+        opt = None
+
+    model = Model(inputs=inputs, outputs=outputs)
+    if opt is not None:
+        model.compile(loss='categorical_crossentropy', optimizer=opt,
+                      metrics=['categorical_crossentropy', 'categorical_accuracy'])
+    model.name = "mixed_cnn"
+    return model
+
+
 def _set_trainable_model(model, value):
     for l in model.layers:
         l.trainable = value
