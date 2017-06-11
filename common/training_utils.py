@@ -274,7 +274,7 @@ def random_more_blue(x, y, channels_first):
             out[:, :, 1] = np.clip(img[:, :, 1] * f2 + b, 0, 1.0)
         return out
 
-    return more_blue(x, b=np.random.randint(-50, 120) * 1.0/255.0, channels_first=channels_first), y
+    return more_blue(x, b=np.random.randint(-30, 20) * 1.0/255.0, channels_first=channels_first), y
 
 
 def random_more_yellow(x, y, channels_first):
@@ -293,7 +293,15 @@ def random_more_yellow(x, y, channels_first):
             out[:, :, 2] = np.clip(img[:, :, 2] * f2 + b, 0, 1.0)
         return out
 
-    return more_yellow(x, b=np.random.randint(-50, 120) * 1.0/255.0, channels_first=channels_first), y
+    return more_yellow(x, b=np.random.randint(-20, 50) * 1.0/255.0, channels_first=channels_first), y
+
+
+def random_inversion(x, y=None):
+    r = np.random.rand()
+    if r > 0.5:
+        return np.power(1.0 - x, 2.0)
+    else:
+        return x
 
 
 # ###### Segmentation task #######
@@ -509,19 +517,21 @@ def get_train_gen_flow(train_id_type_list,
 
     def random_blue_or_yellow(x):
         r = np.random.rand()
-        if r > 0.667:
+        if r > 0.75:
             return r1(x)
-        elif 0.333 < r <= 0.667:
+        elif 0.5 < r <= 0.75:
             return r2(x)
         else:
             return x
 
-    train_gen = ImageDataGenerator(pipeline=('random_transform', random_blue_or_yellow, 'standardize'),
+    train_gen = ImageDataGenerator(pipeline=('random_transform',
+                                             random_blue_or_yellow,
+                                             'standardize'),
                                    featurewise_center=normalize_data,
                                    featurewise_std_normalization=normalize_data,
                                    rotation_range=45.,
-                                   width_shift_range=0.1, height_shift_range=0.1,
-                                   zoom_range=[0.65, 1.2],
+                                   width_shift_range=0.025, height_shift_range=0.025,
+                                   zoom_range=[0.85, 1.05],
                                    horizontal_flip=True,
                                    vertical_flip=True,
                                    fill_mode='reflect')
@@ -593,9 +603,24 @@ def get_val_gen_flow(val_id_type_list,
     else:
         raise Exception("Failed to find backend data format")
 
-    val_gen = ImageDataGenerator(featurewise_center=normalize_data,
+    # r1 = lambda x: random_more_blue(x, None, channels_first)[0]
+    # r2 = lambda x: random_more_yellow(x, None, channels_first)[0]
+    #
+    # def random_blue_or_yellow(x):
+    #     r = np.random.rand()
+    #     if r > 0.75:
+    #         return r1(x)
+    #     elif 0.5 < r <= 0.75:
+    #         return r2(x)
+    #     else:
+    #         return x
+        
+    val_gen = ImageDataGenerator(pipeline=('random_transform', 'standardize'),
+                                 featurewise_center=normalize_data,
                                  featurewise_std_normalization=normalize_data,
                                  rotation_range=45.,
+                                 width_shift_range=0.025, height_shift_range=0.025,
+                                 zoom_range=[0.85, 1.05],
                                  horizontal_flip=True,
                                  vertical_flip=True,
                                  fill_mode='reflect')

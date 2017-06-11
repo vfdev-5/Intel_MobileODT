@@ -10,6 +10,7 @@ from data_utils import test_ids, type_1_ids, type_2_ids, type_3_ids
 from data_utils import GENERATED_DATA
 from image_utils import imwrite
 from xy_providers import cached_image_label_provider as xy_provider
+from training_utils import random_more_blue, random_more_yellow
 
 # Local keras-contrib:
 from preprocessing.image.generators import ImageMaskGenerator, ImageDataGenerator
@@ -98,12 +99,27 @@ def get_test_gen_flow(test_id_type_list,
     else:
         raise Exception("Failed to find backend data format")
 
-    test_gen = ImageDataGenerator(featurewise_center=normalize_data,
+    r1 = lambda x: random_more_blue(x, None, channels_first)[0]
+    r2 = lambda x: random_more_yellow(x, None, channels_first)[0]
+
+    def random_blue_or_yellow(x):
+        r = np.random.rand()
+        if r > 0.75:
+            return r1(x)
+        elif 0.5 < r <= 0.75:
+            return r2(x)
+        else:
+            return x      
+        
+    test_gen = ImageDataGenerator(pipeline=('random_transform', random_blue_or_yellow, 'standardize'),
+                                  featurewise_center=normalize_data,
                                   featurewise_std_normalization=normalize_data,
                                   rotation_range=45.,
+                                  width_shift_range=0.025, height_shift_range=0.025,
+                                  zoom_range=[0.85, 1.05],
                                   horizontal_flip=True,
                                   vertical_flip=True,
-                                  fill_mode='constant')
+                                  fill_mode='reflect')
 
     if normalize_data:
         if normalization == '':

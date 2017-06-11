@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 import cv2
 
-from image_utils import get_image_data, get_os_image, get_cervix_image
+from image_utils import get_image_data, get_os_image, get_cervix_image, scale_percentile
 from data_utils import type_to_index
 
 
@@ -292,6 +292,7 @@ def cached_image_label_provider(image_id_type_list,
                     img = cv2.resize(img, dsize=image_size)
                 if channels_first:
                     img = img.transpose([2, 0, 1])
+
                 img = img.astype(np.float32) / 255.0
 
                 if with_labels:
