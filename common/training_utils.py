@@ -500,9 +500,10 @@ def get_train_gen_flow(train_id_type_list,
                        seed,
                        save_prefix,
                        xy_provider_cache,
-                       verbose):
+                       xy_provider=None,
+                       verbose=1):
 
-    xy_provider = cached_image_label_provider
+    xy_provider = cached_image_label_provider if xy_provider is None else xy_provider
     xy_provider_verbose = 0
 
     if hasattr(K, 'image_data_format'):
@@ -591,9 +592,10 @@ def get_val_gen_flow(val_id_type_list,
                      option,
                      seed,
                      xy_provider_cache,
+                     xy_provider=None,                     
                      test_mode=False):
 
-    xy_provider = cached_image_label_provider
+    xy_provider = cached_image_label_provider if xy_provider is None else xy_provider
     xy_provider_verbose = 0
 
     if hasattr(K, 'image_data_format'):

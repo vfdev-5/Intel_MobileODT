@@ -11,12 +11,16 @@ warnings.filterwarnings("ignore")
 import shutil
 
 # Project
-project_common_path = os.path.dirname('.')
+project_common_path = os.path.dirname(__file__)
 project_common_path = os.path.abspath(os.path.join(project_common_path, '..', 'common'))
 if not project_common_path in sys.path:
     sys.path.append(project_common_path)
 
-
+import platform
+if 'c001' in platform.node():
+    from colfax_configuration import setup_keras_202
+    setup_keras_202()
+        
 from data_utils import RESOURCES_PATH, GENERATED_DATA, get_annotations
 from data_utils import get_id_type_list_from_annotations
 from image_utils import get_image_data
