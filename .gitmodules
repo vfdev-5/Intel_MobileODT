@@ -1,3 +1,6 @@
 [submodule "KerasSqueezeNet"]
 	path = common/KerasSqueezeNet
 	url = https://github.com/vfdev-5/keras-squeezenet
+[submodule "imgaug"]
+	path = common/imgaug
+	url = https://github.com/aleju/imgaug.git

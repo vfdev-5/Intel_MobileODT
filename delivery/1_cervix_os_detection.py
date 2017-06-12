@@ -9,7 +9,7 @@ import shutil
 
 # Project
 project_common_path = os.path.dirname(__file__)
-project_common_path = os.path.abspath(os.path.join(project_common_path, '..', '..', 'common'))
+project_common_path = os.path.abspath(os.path.join(project_common_path, '..', 'common'))
 if not project_common_path in sys.path:
     sys.path.append(project_common_path)
 

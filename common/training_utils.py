@@ -13,6 +13,7 @@ from keras.callbacks import ModelCheckpoint, LearningRateScheduler, CSVLogger
 from keras import backend as K
 from keras import __version__ as keras_version
 
+from imgaug.imgaug import augmenters as iaa
 
 # Project
 from data_utils import type_to_index, type_1_ids, type_2_ids, type_3_ids
@@ -488,8 +489,14 @@ def segmentation_validate(model,
     mean_jaccard_index *= 1.0 / total_counter
     print("Mean jaccard index : ", mean_jaccard_index)
 
+# ##########################################################################################
+# ######################### Classification #################################################
+# ##########################################################################################
 
-# ##### Classification ####
+
+def random_imgaug(x, seq):
+    return seq.augment_images([x, ])[0]
+
 
 def get_train_gen_flow(train_id_type_list,
                        normalize_data,
@@ -512,20 +519,39 @@ def get_train_gen_flow(train_id_type_list,
     else:
         raise Exception("Failed to find backend data format")
 
-    r1 = lambda x: random_more_blue(x, None, channels_first)[0]
-    r2 = lambda x: random_more_yellow(x, None, channels_first)[0]
+    # r1 = lambda x: random_more_blue(x, None, channels_first)[0]
+    # r2 = lambda x: random_more_yellow(x, None, channels_first)[0]
+    #
+    # def _random_blue_or_yellow(x):
+    #
+    #     r = np.random.rand()
+    #     if r > 0.75:
+    #         return r1(x)
+    #     elif 0.5 < r <= 0.75:
+    #         return r2(x)
+    #     else:
+    #         return x
 
-    def random_blue_or_yellow(x):
-        r = np.random.rand()
-        if r > 0.75:
-            return r1(x)
-        elif 0.5 < r <= 0.75:
-            return r2(x)
-        else:
-            return x
+    seq = iaa.Sequential([
+        iaa.Sometimes(0.5, iaa.GaussianBlur(sigma=(0.15, 0.6))),
+        iaa.Sometimes(0.5, iaa.Sharpen(alpha=0.9, lightness=(0.3, 1.4))),
+        iaa.Sometimes(0.5, iaa.AdditiveGaussianNoise(scale=(0, 0.02*255), per_channel=True)),
+        iaa.Sometimes(0.5, iaa.ContrastNormalization(alpha=(0.75, 1.3))),
+        iaa.Sometimes(0.75, iaa.PiecewiseAffine(scale=(0.001, 0.05), mode='reflect')),
+        iaa.Sometimes(0.75, iaa.Affine(translate_px=(-10, 10),
+                                       rotate=(-90.0, 90.0),
+                                       mode='reflect')),
+        iaa.Sometimes(0.75, iaa.Add(value=(-55, 15), per_channel=True)),
+    ],
+        random_order=True,
+        random_state=seed)
 
-    train_gen = ImageDataGenerator(pipeline=('random_transform',
-                                             random_blue_or_yellow,
+    def _random_imgaug(x):
+        return random_imgaug(255.0 * x, seq) * 1.0/255.0
+
+    train_gen = ImageDataGenerator(pipeline=(#'random_transform',
+                                             # _random_blue_or_yellow,
+                                             _random_imgaug,
                                              'standardize'),
                                    featurewise_center=normalize_data,
                                    featurewise_std_normalization=normalize_data,
@@ -614,7 +640,7 @@ def get_val_gen_flow(val_id_type_list,
     #         return r2(x)
     #     else:
     #         return x
-        
+
     val_gen = ImageDataGenerator(pipeline=('random_transform', 'standardize'),
                                  featurewise_center=normalize_data,
                                  featurewise_std_normalization=normalize_data,
@@ -803,7 +829,7 @@ def classification_train(model,
         #                                           val_acc=val_acc,
         #                                           val_precision=val_precision,
         #                                           val_recall=val_recall)
-        
+
         val_loss = history.history['val_loss'][-1]
         val_cat_crossentropy = history.history['val_categorical_crossentropy'][-1]
         val_cat_accuracy = history.history['val_categorical_accuracy'][-1]

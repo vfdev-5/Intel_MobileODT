@@ -681,23 +681,23 @@ def get_mixed_cnn4(optimizer='', lr=0.01, accum_iters=8):
 
     # Block 3
     x = Convolution2D(576, (1, 1), activation='relu', padding='same', name='block3_conv1')(x)
-    x = Convolution2D(512, (1, 1), activation='relu', padding='same', name='block3_conv2')(x)
+    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block3_conv2')(x)
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
 
     # Block 4
-    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block4_conv1')(x)
-    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block4_conv2')(x)
+    x = Convolution2D(128, (1, 1), activation='relu', padding='same', name='block4_conv1')(x)
+    x = Convolution2D(128, (1, 1), activation='relu', padding='same', name='block4_conv2')(x)
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
 
     # Block 5
-    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block5_conv1')(x)
-    x = Convolution2D(256, (1, 1), activation='relu', padding='same', name='block5_conv2')(x)
+    x = Convolution2D(64, (1, 1), activation='relu', padding='same', name='block5_conv1')(x)
+    x = Convolution2D(64, (1, 1), activation='relu', padding='same', name='block5_conv2')(x)
     x = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(x)
 
     # Classification block
     x = Flatten(name='flatten')(x)
-    x = Dense(256, activation='relu', name='fc1')(x)
-    x = Dense(256, activation='relu', name='fc2')(x)
+    x = Dense(32, activation='relu', name='fc1')(x)
+    x = Dense(32, activation='relu', name='fc2')(x)
     outputs = Dense(n_classes, activation='softmax', name='predictions')(x)
 
     if optimizer == 'adadelta':

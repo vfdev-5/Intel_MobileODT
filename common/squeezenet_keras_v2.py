@@ -14,7 +14,7 @@ from keras.optimizers import Adadelta, Adam, SGD
 def get_squeezenet(optimizer='', lr=0.01, weights='imagenet'):
     """
     """
-    input_shape = (299, 299, 3)
+    input_shape = (227, 227, 3)
 
     names_to_train = [
         'fire6/squeeze1x1', 'fire6/expand1x1', 'fire6/expand3x3',
