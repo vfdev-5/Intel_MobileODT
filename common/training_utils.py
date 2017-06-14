@@ -724,7 +724,7 @@ def classification_train(model,
     #                                 "val_cat_accuracy={val_categorical_accuracy:.4f}.h5")
     weights_filename = os.path.join("weights", save_prefix + "_{epoch:02d}_loss={loss:.4f}_val_loss={val_loss:.4f}")
     for mname in model.metrics:
-        weights_filename += "_val_%s={val_%s:.4f}" % (mname, mname)
+        weights_filename += "_%s={%s:.4f}" % (mname, mname)
     weights_filename += ".h5"
 
     model_checkpoint = ModelCheckpoint(weights_filename, monitor='val_loss',
@@ -831,7 +831,7 @@ def classification_train(model,
         kwargs = {}
         for mname in model.metrics:
             key = 'val_' + mname
-            kwargs[key] = history.history['val_categorical_crossentropy'][-1]
+            kwargs[key] = history.history[key][-1]
         weights_filename = weights_filename.format(epoch=nb_epochs,
                                                    val_loss=val_loss, **kwargs)
         model.save_weights(weights_filename)

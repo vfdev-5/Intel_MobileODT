@@ -83,7 +83,7 @@ def get_cnn(optimizer='', lr=0.01, weights='imagenet'):
         opt = None
 
     if opt is not None:
-        model.compile(loss='mse', optimizer=opt, metrics=['accuracy'])
+        model.compile(loss='mae', optimizer=opt, metrics=['accuracy'])
     model.name = "Custom_double_SqueezeNet"
     return model
 
