@@ -16,6 +16,11 @@ project_common_path = os.path.abspath(os.path.join(project_common_path, '..', 'c
 if not project_common_path in sys.path:
     sys.path.append(project_common_path)
 
+import platform
+if 'c001' in platform.node():
+    from colfax_configuration import setup_keras_202
+    setup_keras_202()
+
 
 from data_utils import RESOURCES_PATH, GENERATED_DATA, get_annotations
 from data_utils import get_id_type_list_from_annotations
@@ -56,7 +61,6 @@ except NameError:
     else:
         cache = DataCache(0)
 
-
 from squeezenet_keras_v2 import get_squeezenet
 
 from keras import backend as K
@@ -70,15 +74,15 @@ from data_utils import to_set
 from training_utils import classification_train as train, classification_validate as validate
 from training_utils import find_best_weights_file2
 
-seed = 54321
+seed = 2017
 optimizer = 'adam'
 image_size = (299, 299)
 
-nb_epochs = 50
+nb_epochs = 75
 batch_size = 16
-lr_base = 0.0001
+lr_base = 0.0002
 init_epoch = 0
-a = 0.92
+a = 0.95
 
 load_best_weights = False
 
@@ -90,7 +94,7 @@ from training_utils import exp_decay, step_decay
 
 n_folds = 6
 val_fold_index = 0
-val_fold_indices = [0,]
+val_fold_indices = []
 
 hists = []
 
@@ -137,13 +141,14 @@ for train_id_type_list, val_id_type_list in generate_trainval_kfolds(np.array(tr
               normalize_data=True,
               normalization='vgg',
               nb_epochs=nb_epochs,
-              samples_per_epoch=2 * len(train_id_type_list),
+              samples_per_epoch=3 * len(train_id_type_list),
               nb_val_samples=len(val_id_type_list),
               lrate_decay_f=lrate_decay_f,
               batch_size=batch_size,
               xy_provider_cache=cache,
               image_size=image_size[::-1],
-              seed=seed,              
+              seed=seed,
+              verbose=2,              
               save_prefix=save_prefix)    
     if h is None:
         continue

@@ -16,7 +16,7 @@ from keras import backend as K
 from keras_metrics import precision, recall
 
 
-def get_cnn(optimizer='adam', lr=0.01, weights='imagenet'):
+def get_cnn(optimizer='', lr=0.01, weights='imagenet'):
     """
         CNN joins two SqueezeNets at fire-6 module
     """
@@ -80,9 +80,10 @@ def get_cnn(optimizer='adam', lr=0.01, weights='imagenet'):
     elif optimizer == 'sgd':
         opt = SGD(lr=lr, momentum=0.9, decay=0.00001, nesterov=True)
     else:
-        raise Exception("Optimizer '%s' is unknown" % optimizer)
+        opt = None
 
-    model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy', precision, recall])
+    if opt is not None:
+        model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy', precision, recall])
     model.name = "Custom_double_SqueezeNet"
     return model
 

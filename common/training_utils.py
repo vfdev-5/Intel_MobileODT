@@ -507,9 +507,10 @@ def get_train_gen_flow(train_id_type_list,
                        seed,
                        save_prefix,
                        xy_provider_cache,
-                       verbose):
+                       xy_provider=None,
+                       verbose=1):
 
-    xy_provider = cached_image_label_provider
+    xy_provider = cached_image_label_provider if xy_provider is None else xy_provider
     xy_provider_verbose = 0
 
     if hasattr(K, 'image_data_format'):
@@ -549,13 +550,13 @@ def get_train_gen_flow(train_id_type_list,
     def _random_imgaug(x):
         return random_imgaug(255.0 * x, seq) * 1.0/255.0
 
-    train_gen = ImageDataGenerator(pipeline=(#'random_transform',
+    train_gen = ImageDataGenerator(pipeline=('random_transform',
                                              # _random_blue_or_yellow,
                                              _random_imgaug,
                                              'standardize'),
                                    featurewise_center=normalize_data,
                                    featurewise_std_normalization=normalize_data,
-                                   rotation_range=45.,
+                                   #rotation_range=45.,
                                    width_shift_range=0.025, height_shift_range=0.025,
                                    zoom_range=[0.85, 1.05],
                                    horizontal_flip=True,
@@ -617,9 +618,10 @@ def get_val_gen_flow(val_id_type_list,
                      option,
                      seed,
                      xy_provider_cache,
+                     xy_provider=None,
                      test_mode=False):
 
-    xy_provider = cached_image_label_provider
+    xy_provider = cached_image_label_provider if xy_provider is None else xy_provider
     xy_provider_verbose = 0
 
     if hasattr(K, 'image_data_format'):
@@ -716,10 +718,15 @@ def classification_train(model,
     if not os.path.exists('weights'):
         os.mkdir('weights')
 
-    weights_filename = os.path.join("weights", save_prefix +
-                                    "_{epoch:02d}_val_loss={val_loss:.4f}_" +
-                                    "val_cat_crossentropy={val_categorical_crossentropy:.4f}_" +
-                                    "val_cat_accuracy={val_categorical_accuracy:.4f}.h5")
+    # weights_filename = os.path.join("weights", save_prefix +
+    #                                 "_{epoch:02d}_val_loss={val_loss:.4f}_" +
+    #                                 "val_cat_crossentropy={val_categorical_crossentropy:.4f}_" +
+    #                                 "val_cat_accuracy={val_categorical_accuracy:.4f}.h5")
+    weights_filename = os.path.join("weights", save_prefix + "_{epoch:02d}_loss={loss:.4f}_val_loss={val_loss:.4f}")
+    for mname in model.metrics:
+        weights_filename += "_val_%s={val_%s:.4f}" % (mname, mname)
+    weights_filename += ".h5"
+
     model_checkpoint = ModelCheckpoint(weights_filename, monitor='val_loss',
                                        save_best_only=True, save_weights_only=True)
     now = datetime.now()
@@ -759,7 +766,7 @@ def classification_train(model,
                                                          normalization=normalization,
                                                          batch_size=batch_size,
                                                          seed=seed,
-                                                         image_size=tuple([int(s/2) for s in image_size]),
+                                                         image_size=image_size, #tuple([int(s/2) for s in image_size]),
                                                          option='os',
                                                          save_prefix=save_prefix,
                                                          xy_provider_cache=xy_provider_cache,
@@ -771,7 +778,7 @@ def classification_train(model,
                                                    normalize_data=normalize_data,
                                                    batch_size=batch_size,
                                                    seed=seed,
-                                                   image_size=tuple([int(s/2) for s in image_size]),
+                                                   image_size=image_size, #tuple([int(s/2) for s in image_size]),
                                                    option='os',
                                                    xy_provider_cache=xy_provider_cache)
 
@@ -820,24 +827,13 @@ def classification_train(model,
                                           class_weight=class_weight,
                                           verbose=verbose)
         # save the last
-        #val_loss = history.history['val_loss'][-1]
-        #val_acc = history.history['val_acc'][-1]
-        #val_recall = history.history['val_recall'][-1]
-        #val_precision = history.history['val_precision'][-1]
-        #weights_filename = weights_filename.format(epoch=nb_epochs,
-        #                                           val_loss=val_loss,
-        #                                           val_acc=val_acc,
-        #                                           val_precision=val_precision,
-        #                                           val_recall=val_recall)
-
         val_loss = history.history['val_loss'][-1]
-        val_cat_crossentropy = history.history['val_categorical_crossentropy'][-1]
-        val_cat_accuracy = history.history['val_categorical_accuracy'][-1]
+        kwargs = {}
+        for mname in model.metrics:
+            key = 'val_' + mname
+            kwargs[key] = history.history['val_categorical_crossentropy'][-1]
         weights_filename = weights_filename.format(epoch=nb_epochs,
-                                                   val_loss=val_loss,
-                                                   val_categorical_crossentropy=val_cat_crossentropy,
-                                                   val_categorical_accuracy=val_cat_accuracy)
-
+                                                   val_loss=val_loss, **kwargs)
         model.save_weights(weights_filename)
         return history
 
@@ -1003,4 +999,3 @@ def data_iterator(image_id_type_list, batch_size, image_size, verbose=0, test_mo
 
         if test_mode:
             break
-

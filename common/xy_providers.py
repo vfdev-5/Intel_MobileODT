@@ -311,3 +311,84 @@ def cached_image_label_provider(image_id_type_list,
         if test_mode:
             return
         counter += 1
+
+
+def cached_image_value_provider(image_id_type_list,
+                                image_size,
+                                option=None,  # 'cervix', 'os' or 'cervix/os'
+                                channels_first=True,
+                                test_mode=False,
+                                cache=None,
+                                seed=None,
+                                with_labels=True,
+                                verbose=0):
+
+    if seed is not None:
+        np.random.seed(seed)
+
+    if cache is None:
+        img = get_image_data(*image_id_type_list[0])
+        image_height, image_width, n_channels = img.shape
+        # Let us assume that cache can load 650 Mb
+        n_img = int(650.0 * 1e6 / (1.0 * image_width * image_height * n_channels * 4.0))
+        n_img = min(n_img, len(image_id_type_list))
+        cache = DataCache(n_img)
+        if verbose > 0:
+            print("Initialize cache : %i" % cache.n_samples)
+
+    counter = 0
+    image_id_type_list = list(image_id_type_list)
+    while True:
+        np.random.shuffle(image_id_type_list)
+        for i, (image_id, image_type) in enumerate(image_id_type_list):
+            if verbose > 0:
+                print("Image id/type:", image_id, image_type, "| counter=", i)
+
+            key = (image_id, image_type, option)
+            if key in cache:
+                if verbose > 0:
+                    print("-- Load from RAM")
+                img, label = cache.get(key)
+
+                if channels_first:
+                    if img.shape[1:] != image_size[::-1]:
+                        img = img.transpose([1, 2, 0])
+                        img = cv2.resize(img, dsize=image_size[::-1])
+                        img = img.transpose([2, 0, 1])
+                else:
+                    if img.shape[:2] != image_size[::-1]:
+                        img = cv2.resize(img, dsize=image_size[::-1])
+            else:
+                if verbose > 0:
+                    print("-- Load from disk")
+
+                if option == 'cervix':
+                    img = get_cervix_image(image_id, image_type)
+                elif option == 'os':
+                    img = get_os_image(image_id, image_type)
+                else:
+                    img = get_image_data(image_id, image_type)
+
+                if img.shape[:2] != image_size:
+                    img = cv2.resize(img, dsize=image_size)
+                if channels_first:
+                    img = img.transpose([2, 0, 1])
+
+                img = img.astype(np.float32) / 255.0
+
+                if with_labels:
+                    # type_to_index[image_type] = [0, 1, 2]
+                    label = np.array([type_to_index[image_type]*(-100.0) + np.random.randint(100) + 50.0,])
+                else:
+                    label = None
+                # fill the cache only at first time:
+                if counter == 0:
+                    cache.put(key, (img, label))
+            if test_mode:
+                yield img, label, (image_id, image_type)
+            else:
+                yield img, label
+
+        if test_mode:
+            return
+        counter += 1

@@ -4,3 +4,6 @@
 [submodule "imgaug"]
 	path = common/imgaug
 	url = https://github.com/aleju/imgaug.git
+[submodule "KerasForScience"]
+	path = common/kfs
+	url = https://github.com/the-moliver/kfs

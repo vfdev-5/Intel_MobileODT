@@ -62,6 +62,8 @@ def segmentation_predict(model,
 
     flow = test_gen.flow(xy_provider(test_id_type_list,
                                      image_size=image_size,
+                                     test_mode=True,
+                                     with_labels=False,
                                      cache=xy_provider_cache),
                          len(test_id_type_list),
                          batch_size=batch_size)
